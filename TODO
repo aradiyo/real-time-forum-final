@@ -1,0 +1,11 @@
+# backend
+- work on chat (gorilla websocket pagage) /backend/routes/chat.go
+- work on cookies /backend/utils/sessions.go
+
+
+# frontned
+- work on main html page, add divisions and layers.
+- work on styling css.
+- work on js functionality.
+
+

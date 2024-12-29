@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Forum</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        #login-register, #chat, #register-form {
+            display: none;
+        }
+        #chat {
+            margin-top: 20px;
+        }
+        #chat-box {
+            height: 300px;
+            overflow-y: scroll;
+            border: 1px solid #ccc;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Welcome to Real-Time Forum</h1>
+
+    <!-- Login Form -->
+    <div id="login-register">
+        <h2>Login</h2>
+        <input type="text" id="login-identifier" placeholder="Nickname or Email">
+        <input type="password" id="login-password" placeholder="Password">
+        <button onclick="login()">Login</button>
+        <p>Don't have an account? <button onclick="showRegister()">Register here</button></p>
+    </div>
+
+    <!-- Register Form -->
+    <div id="register-form">
+        <h2>Register</h2>
+        <input type="text" id="reg-nickname" placeholder="Nickname">
+        <input type="email" id="reg-email" placeholder="Email">
+        <input type="password" id="reg-password" placeholder="Password">
+        <input type="text" id="reg-first-name" placeholder="First Name">
+        <input type="text" id="reg-last-name" placeholder="Last Name">
+        <input type="number" id="reg-age" placeholder="Age">
+        <select id="reg-gender">
+            <option value="">Select Gender</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+        </select>
+        <button onclick="register()">Register</button>
+        <p>Already have an account? <button onclick="showLogin()">Login here</button></p>
+    </div>
+
+    <!-- Chat Section -->
+    <div id="chat">
+        <h2>Chat</h2>
+        <div id="chat-box"></div>
+        <input type="text" id="message-input" placeholder="Type your message">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <script src="static/js/app.js"></script>
+</body>
+</html>
