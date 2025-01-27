@@ -1,65 +1,123 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-Time Forum</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-        }
-        #login-register, #chat, #register-form {
-            display: none;
-        }
-        #chat {
-            margin-top: 20px;
-        }
-        #chat-box {
-            height: 300px;
-            overflow-y: scroll;
-            border: 1px solid #ccc;
-            padding: 10px;
-        }
-    </style>
+    <title>ChatterHub - Real-Time Forum</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
 </head>
+
 <body>
-    <h1>Welcome to Real-Time Forum</h1>
+    <nav class="navbar">
+        <div class="brand">
+            <i class="fas fa-comments"></i>
+            <span>ChatterHub</span>
+        </div>
+        <div class="nav-items">
+            <span class="current-user" id="currentUser"></span>
+            <button class="btn-logout" id="navLogout"><i class="fas fa-sign-out-alt"></i> Logout</button>
+        </div>
+    </nav>
 
-    <!-- Login Form -->
-    <div id="login-register">
-        <h2>Login</h2>
-        <input type="text" id="login-identifier" placeholder="Nickname or Email">
-        <input type="password" id="login-password" placeholder="Password">
-        <button onclick="login()">Login</button>
-        <p>Don't have an account? <button onclick="showRegister()">Register here</button></p>
+    <div class="container" id="mainContainer">
+        <!-- Auth Section -->
+        <section id="authSection" class="auth-section">
+            <div class="auth-card">
+                <div class="auth-tabs">
+                    <button class="tab active" data-tab="login">Login</button>
+                    <button class="tab" data-tab="register">Register</button>
+                </div>
+                <form id="loginForm" class="auth-form active">
+                    <input type="text" placeholder="Email or Nickname" required>
+                    <input type="password" placeholder="Password" required>
+                    <button type="submit" class="btn-primary">Login</button>
+                </form>
+                <form id="registerForm" class="auth-form">
+                    <input type="email" placeholder="Email" required>
+                    <input type="text" placeholder="Nickname" required>
+                    <input type="password" placeholder="Password" required>
+                    <input type="text" placeholder="First Name">
+                    <input type="text" placeholder="Last Name">
+                    <input type="number" placeholder="Age">
+                    <select>
+                        <option value="">Select Gender</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="other">Other</option>
+                    </select>
+                    <button type="submit" class="btn-primary">Register</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- Main Content -->
+        <section id="mainContent" class="hidden">
+            <div class="forum-layout">
+                <!-- Posts Section -->
+                <div class="posts-container">
+                    <div class="posts-header">
+                        <h2>Latest Discussions</h2>
+                        <button class="btn-primary" id="newPostBtn"><i class="fas fa-plus"></i> New Post</button>
+                    </div>
+                    <div id="postsList" class="posts-list"></div>
+                </div>
+
+                <!-- Chat Section -->
+                <div class="chat-container">
+                    <div class="chat-sidebar">
+                        <div class="chat-header">
+                            <h3>Conversations</h3>
+                            <div class="search-box">
+                                <input type="text" placeholder="Search users..." id="userSearch">
+                            </div>
+                        </div>
+                        <div id="conversationsList" class="conversations-list"></div>
+                    </div>
+
+                    <div class="chat-main">
+                        <div class="chat-header">
+                            <h3 id="chatPartner">Select a conversation</h3>
+                        </div>
+                        <div class="messages-container" id="chatMessages">
+                            <div class="scroll-anchor"></div>
+                        </div>
+                        <form class="message-form" id="messageForm">
+                            <input type="text" id="messageInput" placeholder="Type your message..." required>
+                            <button type="submit" class="btn-send"><i class="fas fa-paper-plane"></i></button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
     </div>
 
-    <!-- Register Form -->
-    <div id="register-form">
-        <h2>Register</h2>
-        <input type="text" id="reg-nickname" placeholder="Nickname">
-        <input type="email" id="reg-email" placeholder="Email">
-        <input type="password" id="reg-password" placeholder="Password">
-        <input type="text" id="reg-first-name" placeholder="First Name">
-        <input type="text" id="reg-last-name" placeholder="Last Name">
-        <input type="number" id="reg-age" placeholder="Age">
-        <select id="reg-gender">
-            <option value="">Select Gender</option>
-            <option value="male">Male</option>
-            <option value="female">Female</option>
-        </select>
-        <button onclick="register()">Register</button>
-        <p>Already have an account? <button onclick="showLogin()">Login here</button></p>
+    <!-- Post Modal -->
+    <div id="postModal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Create New Post</h3>
+            <form id="postForm">
+                <div class="form-group">
+                    <label>Category</label>
+                    <select id="postCategory" required>
+                        <option value="general">General</option>
+                        <option value="tech">Technology</option>
+                        <option value="gaming">Gaming</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Content</label>
+                    <textarea id="postContent" rows="4" placeholder="What's on your mind?" required></textarea>
+                </div>
+                <button type="submit" class="btn-primary">Publish Post</button>
+            </form>
+        </div>
     </div>
 
-    <!-- Chat Section -->
-    <div id="chat">
-        <h2>Chat</h2>
-        <div id="chat-box"></div>
-        <input type="text" id="message-input" placeholder="Type your message">
-        <button onclick="sendMessage()">Send</button>
-    </div>
-
-    <script src="static/js/app.js"></script>
+    <script src="api.js"></script>
+    <script src="app.js"></script>
 </body>
+
 </html>
