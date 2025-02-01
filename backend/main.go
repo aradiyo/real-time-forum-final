@@ -63,7 +63,7 @@ func main() {
 	})
 
 	// start the server
-	fmt.Println("Server is running on http://localhost:8080")
+	fmt.Println("Server is running on http://localhost:5500")
 	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
 		log.Fatalf("Failed to start server: %v", err)
