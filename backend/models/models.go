@@ -2,14 +2,14 @@ package models
 
 // User represents a user in the system
 type User struct {
-	ID        string // Unique identifier for the user
-	Nickname  string // User's nickname (unique)
-	Email     string // User's email (unique)
-	Password  string // Encrypted password
-	FirstName string // User's first name
-	LastName  string // User's last name
-	Age       int    // User's age
-	Gender    string // User's gender
+	ID        string `json:"id"`
+	Nickname  string `json:"nickname"`
+	Email     string `json:"email"`
+	Password  string `json:"password"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Age       int    `json:"age"`
+	Gender    string `json:"gender"`
 }
 
 // Post represents a user-created post

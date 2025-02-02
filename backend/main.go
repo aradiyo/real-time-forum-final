@@ -49,13 +49,7 @@ func main() {
 	go routes.HandleMessages()
 
 	// route to logout
-	http.HandleFunc("/api/logout", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("Logout Called")
-		utils.DestroySession(w)
-		fmt.Println("Session Destroyed")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Logged out Successfully!"))
-	})
+	http.HandleFunc("/api/logout", routes.LogoutHandler)
 
 	// rotue for homepage (html)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

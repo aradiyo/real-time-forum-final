@@ -3,6 +3,7 @@ package routes
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"real-time-forum/backend/database"
 	"real-time-forum/backend/models"
@@ -95,4 +96,16 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("login successful"))
 
+}
+
+// handle user logout
+
+func LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	utils.DestroySession(w) // Destroy the session by clearing the cookie
+	fmt.Fprintf(w, "Logout successful")
 }

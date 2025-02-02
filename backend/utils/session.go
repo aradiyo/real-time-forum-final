@@ -28,7 +28,7 @@ func GetSession(r *http.Request) (string, error) {
 // clears the session cookie
 func DestroySession(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     "session-cookie",
+		Name:     "session-token",
 		Value:    "",
 		Expires:  time.Now().Add(-1 * time.Hour), // Expire immediately
 		HttpOnly: true,
