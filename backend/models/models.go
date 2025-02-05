@@ -5,11 +5,12 @@ type User struct {
 	ID        string `json:"id"`
 	Nickname  string `json:"nickname"`
 	Email     string `json:"email"`
-	Password  string `json:"password"`
+	Password  string `json:"password,omitempty"`
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
 	Age       int    `json:"age"`
 	Gender    string `json:"gender"`
+	Online    bool   `json:"online,omitempty"`
 }
 
 // Post represents a user-created post.

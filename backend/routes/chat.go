@@ -158,3 +158,15 @@ func GetChatHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(messages)
 }
+
+// IsUserOnline returns true if the given user ID is connected via WebSocket.
+func IsUserOnline(userID string) bool {
+	mutex.Lock()
+	defer mutex.Unlock()
+	for _, id := range clients {
+		if id == userID {
+			return true
+		}
+	}
+	return false
+}

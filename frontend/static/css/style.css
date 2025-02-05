@@ -1,142 +1,216 @@
-/* Basic reset and layout */
+/* --------------------- */
+/* Global Resets & Basics */
+/* --------------------- */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
 body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    display: flex;
-    height: 100vh;
-  }
-  
-  #app {
-    flex: 1;
-    padding: 20px;
-    overflow-y: auto;
-  }
-  
-  #chat-sidebar {
-    width: 300px;
-    border-left: 1px solid #ccc;
-    padding: 10px;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-  }
-  
-  /* Form styling */
-  form {
-    max-width: 400px;
-    margin: 0 auto;
-  }
-  
-  form input, form select, form button, form textarea {
-    display: block;
-    width: 100%;
-    padding: 10px;
-    margin-bottom: 10px;
-    box-sizing: border-box;
-  }
-  
-  form button {
-    cursor: pointer;
-  }
-  
-  /* Navigation links */
-  .link {
-    color: blue;
-    text-decoration: underline;
-    cursor: pointer;
-  }
-  
-  /* Posts feed */
-  .post {
-    border: 1px solid #ddd;
-    padding: 10px;
-    margin-bottom: 10px;
-  }
-  
-  .post h3 {
-    margin: 0 0 10px 0;
-  }
-  
-  /* Comments */
-  .comment {
-    border-top: 1px solid #eee;
-    padding: 5px 0;
-    margin-left: 20px;
-  }
-  
-  /* Chat sidebar */
-  #chat-users {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-  
-  #chat-users li {
-    padding: 8px;
-    border-bottom: 1px solid #ddd;
-    cursor: pointer;
-  }
-  
-  #chat-window {
-    flex: 1;
-    overflow-y: auto;
-    border: 1px solid #ddd;
-    margin-top: 10px;
-    padding: 5px;
-  }
-  
-  .chat-message {
-    margin-bottom: 10px;
-  }
-  
-  .chat-message .meta {
-    font-size: 0.8em;
-    color: #555;
-  }
-  
-  /* Chat input */
-  #chat-input-container {
-    margin-top: 10px;
-  }
-  
-  #chat-input {
-    width: calc(100% - 80px);
-    padding: 10px;
-    box-sizing: border-box;
-  }
-  
-  #chat-send-btn {
-    width: 60px;
-    padding: 10px;
-    cursor: pointer;
-  }
-  
-  /* Modal for comments */
-  .modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0,0,0,0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .modal-content {
-    background-color: #fff;
-    padding: 20px;
-    width: 90%;
-    max-width: 500px;
-    position: relative;
-  }
-  
-  .close {
-    position: absolute;
-    top: 5px;
-    right: 10px;
-    font-size: 1.5em;
-    cursor: pointer;
-  }
-  
+  font-family: Arial, sans-serif;
+  background-color: #f4f4f4;
+}
+
+/* --------------------- */
+/* Layout Containers */
+/* --------------------- */
+#container {
+  display: flex;
+  height: 100vh;
+}
+
+/* Main Application Area */
+#app {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  background-color: #fff;
+}
+
+/* Chat Sidebar */
+#chat-sidebar {
+  width: 350px;
+  background-color: #2f3542;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #ccc;
+}
+
+/* --------------------- */
+/* Chat Sidebar Styling */
+/* --------------------- */
+#chat-sidebar header {
+  padding: 15px;
+  background-color: #3742fa;
+  text-align: center;
+  font-size: 1.2em;
+  font-weight: bold;
+}
+
+#chat-users {
+  list-style: none;
+  overflow-y: auto;
+  flex: 1;
+  padding: 0;
+  margin: 0;
+}
+
+#chat-users li {
+  padding: 10px;
+  border-bottom: 1px solid #57606f;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#chat-users li:hover {
+  background-color: #57606f;
+}
+
+#chat-users li.selected {
+  background-color: #1e90ff;
+}
+
+.status-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 5px;
+}
+
+.status-dot.online {
+  background-color: #2ed573;
+}
+
+.status-dot.offline {
+  background-color: #ced6e0;
+}
+
+#chat-window {
+  height: 300px;
+  overflow-y: auto;
+  background-color: #dfe4ea;
+  color: #2f3542;
+  padding: 10px;
+}
+
+.chat-message {
+  margin-bottom: 10px;
+  padding: 5px;
+  background-color: #fff;
+  border-radius: 5px;
+}
+
+.chat-message .meta {
+  font-size: 0.8em;
+  color: #555;
+  margin-bottom: 3px;
+}
+
+#chat-input-container {
+  padding: 10px;
+  background-color: #ced6e0;
+  display: flex;
+}
+
+#chat-input {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 3px;
+  margin-right: 10px;
+}
+
+#chat-send-btn {
+  padding: 10px 15px;
+  border: none;
+  border-radius: 3px;
+  background-color: #3742fa;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* --------------------- */
+/* Forms (Login / Register) */
+/* --------------------- */
+form {
+  max-width: 400px;
+  margin: 30px auto;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 5px;
+  box-shadow: 0 0 5px rgba(0,0,0,0.1);
+}
+
+form input, form select, form button, form textarea {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 15px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+form button {
+  background-color: #3742fa;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.link {
+  color: #3742fa;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* --------------------- */
+/* Posts Feed Styling */
+/* --------------------- */
+.post {
+  background-color: #fff;
+  padding: 15px;
+  margin-bottom: 15px;
+  border-radius: 5px;
+  box-shadow: 0 0 3px rgba(0,0,0,0.1);
+}
+
+.post h3 {
+  margin-bottom: 10px;
+}
+
+/* --------------------- */
+/* Modal for Comments */
+/* --------------------- */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: #fff;
+  padding: 20px;
+  width: 90%;
+  max-width: 500px;
+  border-radius: 5px;
+  position: relative;
+}
+
+.close {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  font-size: 1.5em;
+  cursor: pointer;
+}

@@ -38,6 +38,7 @@ func main() {
 	http.HandleFunc("/api/register", routes.RegisterHandler)
 	http.HandleFunc("/api/login", routes.LoginHandler)
 	http.HandleFunc("/api/logout", routes.LogoutHandler)
+	http.HandleFunc("/api/session", utils.AuthMiddleware(routes.SessionHandler))
 	http.HandleFunc("/api/posts/create", utils.AuthMiddleware(routes.CreatePostHandler))
 	http.HandleFunc("/api/posts", utils.AuthMiddleware(routes.GetPostsHandler))
 	http.HandleFunc("/api/comments/create", utils.AuthMiddleware(routes.CreateCommentHandler))

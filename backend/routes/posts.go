@@ -125,6 +125,11 @@ func GetCommentsHandler(w http.ResponseWriter, r *http.Request) {
 		comments = append(comments, comment)
 	}
 
+	// Ensure we return an empty array if there are no comments.
+	if comments == nil {
+		comments = []models.Comment{}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(comments)
 }

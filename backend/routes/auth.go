@@ -82,6 +82,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Create a new session token and set cookie.
 	utils.CreateSession(w, user.ID)
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Login successful"))
@@ -94,6 +95,18 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.DestroySession(w)
+	// Pass both the ResponseWriter and Request to DestroySession.
+	utils.DestroySession(w, r)
 	fmt.Fprintf(w, "Logout successful")
+}
+
+// SessionHandler returns the current user's ID if the session is valid.
+func SessionHandler(w http.ResponseWriter, r *http.Request) {
+	userID, err := utils.GetSession(r)
+	if err != nil || userID == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(userID))
 }
