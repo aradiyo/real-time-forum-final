@@ -1,6 +1,6 @@
 package models
 
-// User represents a user in the system
+// User represents a user in the system.
 type User struct {
 	ID        string `json:"id"`
 	Nickname  string `json:"nickname"`
@@ -12,7 +12,7 @@ type User struct {
 	Gender    string `json:"gender"`
 }
 
-// Post represents a user-created post
+// Post represents a user-created post.
 type Post struct {
 	ID        string `json:"id"`
 	UserID    string `json:"user_id"`
@@ -21,7 +21,7 @@ type Post struct {
 	CreatedAt string `json:"created_at"`
 }
 
-// Comment represents a comment on a post
+// Comment represents a comment on a post.
 type Comment struct {
 	ID        string `json:"id"`
 	PostID    string `json:"post_id"`
@@ -30,13 +30,13 @@ type Comment struct {
 	CreatedAt string `json:"created_at"`
 }
 
-// LoginRequest represent the identifier (either nickname or email) and password
-type LoginRequset struct {
+// LoginRequest represents the login credentials.
+type LoginRequest struct {
 	Identifier string `json:"identifier"`
 	Password   string `json:"password"`
 }
 
-// Message represents a private message between users
+// Message represents a private message between users.
 type Message struct {
 	ID         string `json:"id"`
 	SenderID   string `json:"sender_id"`

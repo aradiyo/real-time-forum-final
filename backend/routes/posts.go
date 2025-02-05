@@ -9,53 +9,48 @@ import (
 	"github.com/gofrs/uuid"
 )
 
+// CreatePostHandler allows authenticated users to create posts.
 func CreatePostHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// parse post input
 	var post models.Post
 	if err := json.NewDecoder(r.Body).Decode(&post); err != nil {
 		http.Error(w, "Invalid input data", http.StatusBadRequest)
 		return
 	}
 
-	// generate UUID for the post
 	post.ID = uuid.Must(uuid.NewV4()).String()
 
-	// insert post into database
 	_, err := database.DB.Exec(`
-	INSERT INTO posts (id, user_id, category, content)
-	VALUES (?, ?, ?, ?)`,
+		INSERT INTO posts (id, user_id, category, content)
+		VALUES (?, ?, ?, ?)`,
 		post.ID, post.UserID, post.Category, post.Content)
 	if err != nil {
 		http.Error(w, "Failed to create post: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Success response
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte("Post created successfully"))
-
 }
 
+// GetPostsHandler returns all posts in descending order by creation date.
 func GetPostsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// query from database for posts
-	rows, err := database.DB.Query("SELECT id, user_id, category, content, created_at FROM posts")
+	rows, err := database.DB.Query("SELECT id, user_id, category, content, created_at FROM posts ORDER BY created_at DESC")
 	if err != nil {
 		http.Error(w, "Failed to fetch posts: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
 
-	// store the posts
 	var posts []models.Post
 	for rows.Next() {
 		var post models.Post
@@ -64,72 +59,62 @@ func GetPostsHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		posts = append(posts, post)
-
-		// return the posts as JSON
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(posts)
-
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(posts)
 }
 
+// CreateCommentHandler allows users to comment on posts.
 func CreateCommentHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// parse comment input
 	var comment models.Comment
 	if err := json.NewDecoder(r.Body).Decode(&comment); err != nil {
-		http.Error(w, "Invalid input data", http.StatusBadGateway)
+		http.Error(w, "Invalid input data", http.StatusBadRequest)
 		return
 	}
 
-	// generate UUID for the comment
 	comment.ID = uuid.Must(uuid.NewV4()).String()
 
-	//insert comment into database
 	_, err := database.DB.Exec(`
-	INSERT INTO comments (id, post_id, user_id, content)
-	VALUES (?, ?, ?, ?)`,
+		INSERT INTO comments (id, post_id, user_id, content)
+		VALUES (?, ?, ?, ?)`,
 		comment.ID, comment.PostID, comment.UserID, comment.Content)
-
 	if err != nil {
 		http.Error(w, "Failed to create comment: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Successful response
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte("Comment created successfully"))
 }
 
+// GetCommentsHandler returns comments for a given post.
 func GetCommentsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// get the post_id from query parameters
 	postID := r.URL.Query().Get("post_id")
 	if postID == "" {
 		http.Error(w, "Missing post_id parameter", http.StatusBadRequest)
 		return
 	}
 
-	// query database for the comment
 	rows, err := database.DB.Query(`
-SELECT id, post_id, user_id, content, created_at
-FROM comments WHERE post_id = ?`, postID)
-
+		SELECT id, post_id, user_id, content, created_at
+		FROM comments WHERE post_id = ? ORDER BY created_at ASC`, postID)
 	if err != nil {
 		http.Error(w, "Failed to fetch comments: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
 
-	// store the comments
 	var comments []models.Comment
 	for rows.Next() {
 		var comment models.Comment
