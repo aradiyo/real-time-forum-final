@@ -1,16 +1,19 @@
-# backend
-- work on chat (gorilla websocket pagage) /backend/routes/chat.go
-- work on cookies /backend/utils/sessions.go
-
-
-# frontned
-- work on main html page, add divisions and layers.
-- work on styling css.
-- work on js functionality.
-
-
 problems :
+- post creation is not real-time (if I open two browsers and created one post from first one, they other browser need to refresh in order to show post!), I want it to be real time without refresh!
+- post creation is showing only Category, Content and time created, it doesnt show creator nickname ! I want to show createor nick name as well.
+- if other user created a post, I cant comment on it ! please fix this
+- I want Direct messages to be as a toggle show on click (and disable if logout or in authentication page (login or register))
+- Online users doesn't show as green, please fix this to be green when they online and back to grey when it's offline!
+- DM not working as intended : (messages are saved in database but not shown to user neither real time nor later when click on the user) & it not shown at all when refreshing the page!
+- user registration and user login are case sensetive (for nickname and email), please fix this.
+- if there is no posts yet, there is message shown as (Error loading posts: null is not an object (evaluating 'posts.forEach')), I want to change this message to (There is no posts yet, please create one!)
+- these messages are shown in the terminal when running app (Error reading message: json: cannot unmarshal object into Go struct field Message.sender_id of type string
+Error reading message: websocket: close 1001 (going away)
+Error reading message: websocket: close 1001 (going away)
+Error reading message: websocket: close 1005 (no status)
+Error reading message: websocket: close 1001 (going away)
+)
 
 
-- Direct messages to be as a toggle.
-- DM not working as intended.
+
+
