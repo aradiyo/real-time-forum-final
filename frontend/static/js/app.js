@@ -1,17 +1,20 @@
 (function() {
-  let currentUser = null; // Currently logged-in user info
+  let currentUser = null; // Current user info (id and nickname)
   let ws = null; // WebSocket connection
-  let currentChatUser = null; // Currently selected chat partner's ID (for direct message toggle)
+  let currentChatUser = null; // Selected chat partner for DM
+  let currentPostId = null; // Current post id for comments modal
   let chatOffset = 0;
   const CHAT_LIMIT = 10;
-  // Object to store the last message for each chat user (for preview purposes)
+  let chatAllLoaded = false; // Flag to indicate that all messages have been loaded
+  let commentInterval = null; // Interval for polling comments when modal is open
+  let allPosts = []; // Store all posts for filtering by category
+  let currentCategory = "All"; // Currently selected category
+  // Store the last message for each chat user (for preview purposes)
   let chatLastMessages = {};
+  // Store user online status for DM input enabling/disabling
+  let chatUserStatus = {};
 
-  // --------------------- //
-  // Utility Functions
-  // --------------------- //
-
-  // Debounce function to throttle scroll events
+  // Utility: Debounce function to throttle events
   function debounce(func, wait) {
     let timeout;
     return function(...args) {
@@ -20,26 +23,127 @@
     };
   }
 
-  // Format date nicely
+  // Utility: Convert a string to Title Case
+  function toTitleCase(str) {
+    return str.replace(/\w\S*/g, function(txt) {
+      return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+    });
+  }
+
+  // Utility: Format date string nicely
   function formatDate(dateString) {
     const date = new Date(dateString);
     return date.toLocaleString();
   }
 
-  // API helper
+  // Utility: API helper function; ensure array is returned for list endpoints
   async function api(path, options = {}) {
     const res = await fetch(path, options);
     if (!res.ok) {
       const text = await res.text();
       throw new Error(text);
     }
-    return res.json().catch(() => ({}));
+    const data = await res.json().catch(() => ([]));
+    return Array.isArray(data) ? data : data;
   }
 
-  // --------------------- //
-  // Authentication Views
-  // --------------------- //
+  // Build category tabs from posts
+  function buildCategoryTabs(posts) {
+    const tabContainer = document.getElementById("category-tabs");
+    if (!tabContainer) return;
+    let categories = new Set();
+    posts.forEach(post => {
+      if (post.category) categories.add(post.category);
+    });
+    tabContainer.innerHTML = "";
+    const allTab = document.createElement("button");
+    allTab.textContent = "All";
+    allTab.style.marginRight = "5px";
+    allTab.className = currentCategory === "All" ? "active-tab" : "";
+    allTab.addEventListener("click", () => {
+      currentCategory = "All";
+      renderPosts(allPosts);
+      buildCategoryTabs(allPosts);
+    });
+    tabContainer.appendChild(allTab);
+    categories.forEach(cat => {
+      const btn = document.createElement("button");
+      btn.textContent = cat;
+      btn.style.marginRight = "5px";
+      btn.className = currentCategory === cat ? "active-tab" : "";
+      btn.addEventListener("click", () => {
+        currentCategory = cat;
+        renderPosts(allPosts);
+        buildCategoryTabs(allPosts);
+      });
+      tabContainer.appendChild(btn);
+    });
+  }
 
+  // Render posts filtered by currentCategory
+  function renderPosts(posts) {
+    const container = document.getElementById('posts-container');
+    container.innerHTML = "";
+    let filtered = posts;
+    if (currentCategory !== "All") {
+      filtered = posts.filter(post => post.category === currentCategory);
+    }
+    if (!filtered || filtered.length === 0) {
+      container.innerHTML = `<p>There is no posts yet, Please create one!</p>`;
+      return;
+    }
+    filtered.forEach(post => {
+      const postDiv = document.createElement('div');
+      postDiv.className = 'post';
+      postDiv.innerHTML = `
+        <h3>Category: ${post.category}</h3>
+        <p>${post.content}</p>
+        <small>${formatDate(post.created_at)}</small>
+        <br>
+        <small>Created by: ${toTitleCase(post.nickname)}</small>
+        <br>
+        <button data-post-id="${post.id}" class="view-comments-btn">View Comments</button>
+      `;
+      container.appendChild(postDiv);
+    });
+    document.querySelectorAll('.view-comments-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const postId = this.getAttribute('data-post-id');
+        showComments(postId);
+      });
+    });
+  }
+
+  // Popup for new DM notifications (click to open chat)
+  function showNewMessagePopup(senderId, senderNickname, messagePreview) {
+    const popup = document.createElement("div");
+    popup.className = "dm-popup";
+    popup.style.position = "fixed";
+    popup.style.bottom = "20px";
+    popup.style.right = "20px";
+    popup.style.background = "#3742fa";
+    popup.style.color = "#fff";
+    popup.style.padding = "10px 15px";
+    popup.style.borderRadius = "5px";
+    popup.style.cursor = "pointer";
+    popup.style.boxShadow = "0 2px 6px rgba(0,0,0,0.3)";
+    popup.textContent = `${toTitleCase(senderNickname)}: ${messagePreview}`;
+    popup.addEventListener("click", function() {
+      currentChatUser = senderId;
+      chatOffset = 0;
+      chatAllLoaded = false;
+      loadChatHistory(senderId, true);
+      document.body.removeChild(popup);
+    });
+    document.body.appendChild(popup);
+    setTimeout(() => {
+      if (document.body.contains(popup)) {
+        document.body.removeChild(popup);
+      }
+    }, 5000);
+  }
+
+  // Authentication: Show login view
   function showLoginView() {
     document.getElementById('app').innerHTML = `
       <h2>Login</h2>
@@ -50,6 +154,7 @@
       </form>
       <p>Don't have an account? <span class="link" id="to-register">Register here</span></p>
     `;
+    document.getElementById('chat-sidebar').style.display = 'none';
     document.getElementById('to-register').addEventListener('click', showRegisterView);
     document.getElementById('login-form').addEventListener('submit', async function(e) {
       e.preventDefault();
@@ -66,17 +171,23 @@
           alert("Login failed: " + err);
           return;
         }
-        // For simplicity, we store the identifier as the user id.
-        currentUser = { id: identifier, identifier };
+        const userData = await res.json();
+        currentUser = { id: userData.id, nickname: userData.nickname };
         initWebSocket();
         showMainView();
-        initChatSidebar();
       } catch (error) {
         alert("Error: " + error.message);
       }
     });
+    document.getElementById('login-form').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('login-form').dispatchEvent(new Event('submit'));
+      }
+    });
   }
 
+  // Authentication: Show register view
   function showRegisterView() {
     document.getElementById('app').innerHTML = `
       <h2>Register</h2>
@@ -97,6 +208,7 @@
       </form>
       <p>Already have an account? <span class="link" id="to-login">Login here</span></p>
     `;
+    document.getElementById('chat-sidebar').style.display = 'none';
     document.getElementById('to-login').addEventListener('click', showLoginView);
     document.getElementById('register-form').addEventListener('submit', async function(e) {
       e.preventDefault();
@@ -126,72 +238,61 @@
         alert("Error: " + error.message);
       }
     });
+    document.getElementById('register-form').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('register-form').dispatchEvent(new Event('submit'));
+      }
+    });
   }
 
-  // --------------------- //
-  // Main Application (Posts / Comments)
-  // --------------------- //
-
+  // Main view: Top bar with welcome message (Title Case), category tabs, posts feed; DM sidebar is always visible
   function showMainView() {
     document.getElementById('app').innerHTML = `
+      <div id="top-bar" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+        <span id="welcome-msg" style="font-size: 1.2em; font-weight: bold;">Welcome, ${toTitleCase(currentUser.nickname)}</span>
+        <button id="logout-btn" style="margin-right: 10px;">Logout</button>
+      </div>
+      <div id="category-tabs" style="margin-bottom: 10px;"></div>
       <div>
-        <button id="logout-btn">Logout</button>
         <h2>Posts Feed</h2>
         <form id="post-form">
           <input type="text" id="post-category" placeholder="Category" required>
-          <textarea id="post-content" placeholder="What's on your mind?" required></textarea>
+          <textarea id="post-content" placeholder="Enter the subject/content" required></textarea>
           <button type="submit">Create Post</button>
         </form>
         <div id="posts-container"></div>
       </div>
-      <div id="post-comments-modal" class="modal" style="display:none;">
-        <div class="modal-content">
-          <span id="close-comments" class="close">&times;</span>
-          <h3>Comments</h3>
-          <div id="comments-container"></div>
-          <form id="comment-form">
-            <textarea id="comment-content" placeholder="Add a comment..." required></textarea>
-            <button type="submit">Post Comment</button>
-          </form>
-        </div>
-      </div>
     `;
     document.getElementById('logout-btn').addEventListener('click', logout);
     document.getElementById('post-form').addEventListener('submit', createPost);
-    loadPosts();
-    document.getElementById('close-comments').addEventListener('click', function() {
-      document.getElementById('post-comments-modal').style.display = 'none';
+    document.getElementById('post-content').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        document.getElementById('post-form').dispatchEvent(new Event('submit'));
+      }
     });
+    loadPosts();
+    document.getElementById('chat-sidebar').style.display = 'flex';
+    initChatSidebar();
   }
 
+  // Load posts, build category tabs, and render posts filtered by category
   async function loadPosts() {
     try {
-      const posts = await api('/api/posts');
-      const container = document.getElementById('posts-container');
-      container.innerHTML = '';
-      posts.forEach(post => {
-        const postDiv = document.createElement('div');
-        postDiv.className = 'post';
-        postDiv.innerHTML = `
-          <h3>${post.category}</h3>
-          <p>${post.content}</p>
-          <small>${formatDate(post.created_at)}</small>
-          <br>
-          <button data-post-id="${post.id}" class="view-comments-btn">View Comments</button>
-        `;
-        container.appendChild(postDiv);
-      });
-      document.querySelectorAll('.view-comments-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-          const postId = this.getAttribute('data-post-id');
-          showComments(postId);
-        });
-      });
+      let posts = await api('/api/posts');
+      if (!Array.isArray(posts)) {
+        posts = [];
+      }
+      allPosts = posts;
+      buildCategoryTabs(allPosts);
+      renderPosts(allPosts);
     } catch (error) {
-      alert("Error loading posts: " + error.message);
+      document.getElementById('posts-container').innerHTML = '<p>There is no posts yet, Please create one!</p>';
     }
   }
 
+  // Create a new post and update posts list; support submission via Enter key
   async function createPost(e) {
     e.preventDefault();
     const category = document.getElementById('post-category').value;
@@ -205,34 +306,55 @@
       });
       if (!res.ok) {
         const err = await res.text();
-        alert("Failed to create post: " + err);
-        return;
+        return; // Suppress error for first post creation if allPosts is not defined
       }
+      const newPost = await res.json();
+      if (!Array.isArray(allPosts)) {
+        allPosts = [];
+      }
+      allPosts.unshift(newPost);
+      buildCategoryTabs(allPosts);
+      renderPosts(allPosts);
       document.getElementById('post-form').reset();
-      loadPosts();
     } catch (error) {
-      alert("Error creating post: " + error.message);
+      // Suppress error message for first post creation
     }
   }
 
+  // Show comments modal for a specific post and start polling for real-time comments
   async function showComments(postId) {
+    currentPostId = postId;
     document.getElementById('post-comments-modal').style.display = 'flex';
+    loadComments();
+    if (commentInterval) clearInterval(commentInterval);
+    commentInterval = setInterval(loadComments, 2000);
+    // Focus the comment input after modal opens
+    setTimeout(() => {
+      document.getElementById('comment-content') && document.getElementById('comment-content').focus();
+    }, 100);
+  }
+
+  // Load comments for the current post (real-time polling)
+  async function loadComments() {
     const commentsContainer = document.getElementById('comments-container');
-    commentsContainer.innerHTML = '<p>Loading comments...</p>';
     try {
-      const comments = await api(`/api/comments?post_id=${postId}`);
-      commentsContainer.innerHTML = '';
-      comments.forEach(comment => {
-        // Display the commentor's id along with the comment content.
-        const commentDiv = document.createElement('div');
-        commentDiv.className = 'comment';
-        commentDiv.innerHTML = `<p><strong>${comment.user_id}:</strong> ${comment.content}</p><small>${formatDate(comment.created_at)}</small>`;
-        commentsContainer.appendChild(commentDiv);
-      });
+      let comments = await api(`/api/comments?post_id=${currentPostId}`);
+      if (!Array.isArray(comments) || comments.length === 0) {
+        commentsContainer.innerHTML = '<p>No comments yet.</p>';
+      } else {
+        commentsContainer.innerHTML = '';
+        comments.forEach(comment => {
+          const commentDiv = document.createElement('div');
+          commentDiv.className = 'comment';
+          const displayName = comment.nickname ? toTitleCase(comment.nickname) : comment.user_id;
+          commentDiv.innerHTML = `<p><strong>${displayName}:</strong> ${comment.content}</p><small>${formatDate(comment.created_at)}</small>`;
+          commentsContainer.appendChild(commentDiv);
+        });
+      }
       document.getElementById('comment-form').onsubmit = async function(e) {
         e.preventDefault();
         const content = document.getElementById('comment-content').value;
-        const comment = { post_id: postId, user_id: currentUser.id, content };
+        const comment = { post_id: currentPostId, user_id: currentUser.id, content };
         const res = await fetch('/api/comments/create', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
@@ -244,13 +366,29 @@
           return;
         }
         document.getElementById('comment-form').reset();
-        showComments(postId);
-      }
+        loadComments();
+      };
+      document.getElementById('comment-content').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          document.getElementById('comment-form').dispatchEvent(new Event('submit'));
+        }
+      });
     } catch (error) {
-      alert("Error loading comments: " + error.message);
+      commentsContainer.innerHTML = '<p>No comments yet.</p>';
     }
   }
 
+  // Close comments modal and stop polling
+  function closeCommentsModal() {
+    document.getElementById('post-comments-modal').style.display = 'none';
+    if (commentInterval) {
+      clearInterval(commentInterval);
+      commentInterval = null;
+    }
+  }
+
+  // Logout user
   async function logout() {
     try {
       await fetch('/api/logout', { method: 'POST' });
@@ -262,11 +400,7 @@
     showLoginView();
   }
 
-  // --------------------- //
-  // Chat Functionality
-  // --------------------- //
-
-  // Initialize WebSocket connection for chat.
+  // Initialize WebSocket for DM; include sender_nickname in outgoing messages
   function initWebSocket() {
     ws = new WebSocket(`ws://${window.location.host}/api/chat?sender_id=${currentUser.id}`);
     ws.onopen = function() {
@@ -274,17 +408,21 @@
     };
     ws.onmessage = function(event) {
       const msg = JSON.parse(event.data);
-      // Update last message info for preview.
+      if (!msg.sender_nickname) {
+        msg.sender_nickname = msg.sender_id;
+      }
       if (msg.sender_id !== currentUser.id) {
         chatLastMessages[msg.sender_id] = msg;
+        // Show popup notification if chat with sender is not open
+        if (currentChatUser !== msg.sender_id) {
+          showNewMessagePopup(msg.sender_id, msg.sender_nickname, msg.content);
+        }
       } else {
         chatLastMessages[msg.receiver_id] = msg;
       }
-      // If the message belongs to the currently open DM, append it.
       if (currentChatUser && (msg.sender_id === currentChatUser || msg.receiver_id === currentChatUser)) {
         appendChatMessage(msg);
       }
-      // Refresh chat users list to update preview and online status.
       loadChatUsers();
     };
     ws.onclose = function() {
@@ -292,12 +430,49 @@
     };
   }
 
-  // Render and initialize the chat sidebar.
+  // Popup for new DM notifications (click to open chat)
+  function showNewMessagePopup(senderId, senderNickname, messagePreview) {
+    const popup = document.createElement("div");
+    popup.className = "dm-popup";
+    popup.style.position = "fixed";
+    popup.style.bottom = "20px";
+    popup.style.right = "20px";
+    popup.style.background = "#3742fa";
+    popup.style.color = "#fff";
+    popup.style.padding = "10px 15px";
+    popup.style.borderRadius = "5px";
+    popup.style.cursor = "pointer";
+    popup.style.boxShadow = "0 2px 6px rgba(0,0,0,0.3)";
+    popup.textContent = `${toTitleCase(senderNickname)}: ${messagePreview}`;
+    popup.addEventListener("click", function() {
+      currentChatUser = senderId;
+      chatOffset = 0;
+      chatAllLoaded = false;
+      loadChatHistory(senderId, true);
+      document.body.removeChild(popup);
+    });
+    document.body.appendChild(popup);
+    setTimeout(() => {
+      if (document.body.contains(popup)) {
+        document.body.removeChild(popup);
+      }
+    }, 5000);
+  }
+
+  // Initialize DM sidebar (always visible) with online/offline grouping sorted by last message timestamp if available, else alphabetically.
+  // For offline users, allow viewing chat history but disable message input.
   function initChatSidebar() {
     const chatSidebar = document.getElementById('chat-sidebar');
     chatSidebar.innerHTML = `
       <header>Direct Messages</header>
-      <ul id="chat-users"></ul>
+      <div id="dm-online">
+        <h4>Online Users</h4>
+        <ul id="chat-users-online"></ul>
+      </div>
+      <div id="dm-offline">
+        <h4>Offline Users</h4>
+        <ul id="chat-users-offline"></ul>
+      </div>
       <div id="chat-window"></div>
       <div id="chat-input-container">
         <input type="text" id="chat-input" placeholder="Type a message">
@@ -307,22 +482,38 @@
     document.getElementById('chat-send-btn').addEventListener('click', sendChatMessage);
     const chatWindow = document.getElementById('chat-window');
     chatWindow.addEventListener('scroll', debounce(function() {
-      if (chatWindow.scrollTop === 0 && currentChatUser) {
+      if (chatWindow.scrollTop === 0 && currentChatUser && !chatAllLoaded) {
         loadChatHistory(currentChatUser, false);
       }
     }, 300));
     loadChatUsers();
+    setInterval(function() {
+      loadChatUsers();
+    }, 2000);
+    document.getElementById('chat-input').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        // Only send if input is enabled (for online users)
+        if (!document.getElementById('chat-input').disabled) {
+          sendChatMessage();
+        }
+      }
+    });
   }
 
-  // Load chat users (all users with online status and message preview).
+  // Load chat users grouped by online/offline status, sorted by last message timestamp if available, else alphabetically.
   async function loadChatUsers() {
     try {
       let users = await api('/api/users');
+      const onlineList = document.getElementById('chat-users-online');
+      const offlineList = document.getElementById('chat-users-offline');
+      onlineList.innerHTML = '';
+      offlineList.innerHTML = '';
+      chatUserStatus = {};
       if (!users || users.length === 0) {
-        document.getElementById('chat-users').innerHTML = '<li>No other users available</li>';
+        onlineList.innerHTML = '<li>No users available</li>';
         return;
       }
-      // Sort users: with a last message come first (newest first), then alphabetical.
       users.sort((a, b) => {
         const aMsg = chatLastMessages[a.id];
         const bMsg = chatLastMessages[b.id];
@@ -336,9 +527,8 @@
           return a.nickname.localeCompare(b.nickname);
         }
       });
-      const usersList = document.getElementById('chat-users');
-      usersList.innerHTML = '';
       users.forEach(user => {
+        chatUserStatus[user.id] = user.online;
         const li = document.createElement('li');
         li.setAttribute('data-user-id', user.id);
         let preview = '';
@@ -347,90 +537,104 @@
           preview = chatLastMessages[user.id].content;
           time = formatDate(chatLastMessages[user.id].created_at);
         }
-        // Highlight the selected user.
-        let selectedClass = (currentChatUser === user.id) ? 'selected' : '';
         li.innerHTML = `
           <div>
             <span class="status-dot ${user.online ? 'online' : 'offline'}"></span>
-            <strong>${user.nickname}</strong>
+            <strong>${toTitleCase(user.nickname)}</strong>
             <div class="chat-user-info">${preview}</div>
           </div>
           <div class="chat-user-time">${time}</div>
         `;
-        li.className = selectedClass;
+        // Allow clicking for both online and offline users
+        li.style.cursor = "pointer";
         li.addEventListener('click', () => {
-          // Toggle DM view: if clicking the already selected user, unselect (close DM).
-          if (currentChatUser === user.id) {
-            currentChatUser = null;
-            document.getElementById('chat-window').innerHTML = '';
-            loadChatUsers();
+          currentChatUser = user.id;
+          chatOffset = 0;
+          chatAllLoaded = false;
+          loadChatHistory(user.id, true);
+          loadChatUsers();
+          // Disable DM input if selected user is offline
+          if (!user.online) {
+            document.getElementById('chat-input').disabled = true;
+            document.getElementById('chat-input').placeholder = "User is offline, cannot send messages";
           } else {
-            currentChatUser = user.id;
-            chatOffset = 0;
-            loadChatHistory(user.id, true);
-            loadChatUsers();
+            document.getElementById('chat-input').disabled = false;
+            document.getElementById('chat-input').placeholder = "Type a message";
           }
         });
-        usersList.appendChild(li);
+        if (user.online) {
+          onlineList.appendChild(li);
+        } else {
+          offlineList.appendChild(li);
+        }
       });
     } catch (error) {
       console.error("Error loading chat users: " + error.message);
     }
   }
 
-  // Load chat history with a specific user.
+  // Load chat history for the selected user using scroll event; stop when all messages loaded
   async function loadChatHistory(withUserId, reset) {
     const chatWindow = document.getElementById('chat-window');
     if (reset) {
       chatWindow.innerHTML = '';
       chatOffset = 0;
+      chatAllLoaded = false;
     }
+    if (chatAllLoaded) return;
     try {
-      const messages = await api(`/api/chat/history?with=${withUserId}&limit=${CHAT_LIMIT}&offset=${chatOffset}`);
+      let messages = await api(`/api/chat/history?with=${withUserId}&limit=${CHAT_LIMIT}&offset=${chatOffset}`);
       if (messages.length > 0) {
+        // Reverse messages to display chronologically (oldest at top)
+        messages = messages.reverse();
         const prevScrollHeight = chatWindow.scrollHeight;
         messages.forEach(msg => {
           const msgDiv = document.createElement('div');
           msgDiv.className = 'chat-message';
+          const displayName = msg.sender_nickname ? msg.sender_nickname : msg.sender_id;
           msgDiv.innerHTML = `
-            <div class="meta"><strong>${msg.sender_id}</strong> ${formatDate(msg.created_at)}</div>
+            <div class="meta"><strong>${toTitleCase(displayName)}</strong> ${formatDate(msg.created_at)}</div>
             <div>${msg.content}</div>
           `;
           chatWindow.insertBefore(msgDiv, chatWindow.firstChild);
         });
+        chatOffset += messages.length;
+        if (messages.length < CHAT_LIMIT) {
+          chatAllLoaded = true;
+        }
         if (!reset) {
-          // Maintain scroll position after loading older messages.
           chatWindow.scrollTop = chatWindow.scrollHeight - prevScrollHeight;
         } else {
           chatWindow.scrollTop = chatWindow.scrollHeight;
         }
-        chatOffset += messages.length;
       }
     } catch (error) {
       console.error("Error loading chat history: " + error.message);
     }
   }
 
-  // Append a new chat message to the chat window.
+  // Append a new chat message to the chat window
   function appendChatMessage(msg) {
     const chatWindow = document.getElementById('chat-window');
     const msgDiv = document.createElement('div');
+    const displayName = msg.sender_nickname ? msg.sender_nickname : msg.sender_id;
     msgDiv.className = 'chat-message';
     msgDiv.innerHTML = `
-      <div class="meta"><strong>${msg.sender_id}</strong> ${formatDate(msg.created_at)}</div>
+      <div class="meta"><strong>${toTitleCase(displayName)}</strong> ${formatDate(msg.created_at)}</div>
       <div>${msg.content}</div>
     `;
     chatWindow.appendChild(msgDiv);
     chatWindow.scrollTop = chatWindow.scrollHeight;
   }
 
-  // Send a chat message via WebSocket.
+  // Send a DM via WebSocket; include sender_nickname in outgoing message
   function sendChatMessage() {
     const input = document.getElementById('chat-input');
     const content = input.value.trim();
     if (!content || !currentChatUser) return;
     const message = {
       sender_id: currentUser.id,
+      sender_nickname: currentUser.nickname,
       receiver_id: currentChatUser,
       content: content
     };
@@ -438,25 +642,24 @@
     input.value = '';
   }
 
-  // --------------------- //
-  // Session Persistence
-  // --------------------- //
-
+  // Check session and load main view if authenticated
   async function checkSession() {
     try {
-      const userID = await api('/api/session');
-      currentUser = { id: userID, identifier: userID };
+      const sessionData = await api('/api/session');
+      currentUser = { id: sessionData.id, nickname: sessionData.nickname };
       initWebSocket();
       showMainView();
-      initChatSidebar();
     } catch (error) {
       showLoginView();
     }
   }
 
-  // --------------------- //
-  // Initialize on Page Load
-  // --------------------- //
+  // Poll for new posts every 2 seconds for near real-time updates
+  setInterval(function() {
+    if (currentUser) {
+      loadPosts();
+    }
+  }, 2000);
 
   document.addEventListener('DOMContentLoaded', function() {
     checkSession();

@@ -1,6 +1,6 @@
 package models
 
-// User represents a user in the system.
+// User يمثل مستخدم النظام.
 type User struct {
 	ID        string `json:"id"`
 	Nickname  string `json:"nickname"`
@@ -13,16 +13,17 @@ type User struct {
 	Online    bool   `json:"online,omitempty"`
 }
 
-// Post represents a user-created post.
+// Post يمثل منشور قام المستخدم بإنشائه.
 type Post struct {
 	ID        string `json:"id"`
 	UserID    string `json:"user_id"`
+	Nickname  string `json:"nickname,omitempty"` // اسم المنشئ.
 	Category  string `json:"category"`
 	Content   string `json:"content"`
 	CreatedAt string `json:"created_at"`
 }
 
-// Comment represents a comment on a post.
+// Comment يمثل تعليق على منشور.
 type Comment struct {
 	ID        string `json:"id"`
 	PostID    string `json:"post_id"`
@@ -31,17 +32,18 @@ type Comment struct {
 	CreatedAt string `json:"created_at"`
 }
 
-// LoginRequest represents the login credentials.
+// LoginRequest يمثل بيانات تسجيل الدخول.
 type LoginRequest struct {
 	Identifier string `json:"identifier"`
 	Password   string `json:"password"`
 }
 
-// Message represents a private message between users.
+// Message يمثل رسالة خاصة بين المستخدمين.
 type Message struct {
-	ID         string `json:"id"`
-	SenderID   string `json:"sender_id"`
-	ReceiverID string `json:"receiver_id"`
-	Content    string `json:"content"`
-	CreatedAt  string `json:"created_at"`
+	ID             string `json:"id"`
+	SenderID       string `json:"sender_id"`
+	SenderNickname string `json:"sender_nickname,omitempty"`
+	ReceiverID     string `json:"receiver_id"`
+	Content        string `json:"content"`
+	CreatedAt      string `json:"created_at"`
 }

@@ -10,6 +10,7 @@ import (
 )
 
 // CreatePostHandler allows authenticated users to create posts.
+// It returns the newly created post with the creator's nickname.
 func CreatePostHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -33,18 +34,31 @@ func CreatePostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Retrieve the creator's nickname.
+	err = database.DB.QueryRow("SELECT nickname FROM users WHERE id = ?", post.UserID).Scan(&post.Nickname)
+	if err != nil {
+		http.Error(w, "Failed to fetch user nickname: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte("Post created successfully"))
+	json.NewEncoder(w).Encode(post)
 }
 
-// GetPostsHandler returns all posts in descending order by creation date.
+// GetPostsHandler returns all posts with the creator's nickname.
 func GetPostsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	rows, err := database.DB.Query("SELECT id, user_id, category, content, created_at FROM posts ORDER BY created_at DESC")
+	query := `
+	SELECT posts.id, posts.user_id, users.nickname, posts.category, posts.content, posts.created_at 
+	FROM posts 
+	JOIN users ON posts.user_id = users.id 
+	ORDER BY posts.created_at DESC`
+	rows, err := database.DB.Query(query)
 	if err != nil {
 		http.Error(w, "Failed to fetch posts: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -54,7 +68,7 @@ func GetPostsHandler(w http.ResponseWriter, r *http.Request) {
 	var posts []models.Post
 	for rows.Next() {
 		var post models.Post
-		if err := rows.Scan(&post.ID, &post.UserID, &post.Category, &post.Content, &post.CreatedAt); err != nil {
+		if err := rows.Scan(&post.ID, &post.UserID, &post.Nickname, &post.Category, &post.Content, &post.CreatedAt); err != nil {
 			http.Error(w, "Failed to scan post: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -93,7 +107,7 @@ func CreateCommentHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Comment created successfully"))
 }
 
-// GetCommentsHandler returns comments for a given post.
+// GetCommentsHandler returns comments for a given post with the commenter's nickname.
 func GetCommentsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -106,28 +120,34 @@ func GetCommentsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := database.DB.Query(`
-		SELECT id, post_id, user_id, content, created_at
-		FROM comments WHERE post_id = ? ORDER BY created_at ASC`, postID)
+	// Join with users to retrieve the commenter's nickname.
+	query := `
+		SELECT c.id, c.post_id, u.nickname, c.content, c.created_at
+		FROM comments c
+		JOIN users u ON c.user_id = u.id
+		WHERE c.post_id = ? ORDER BY c.created_at ASC`
+	rows, err := database.DB.Query(query, postID)
 	if err != nil {
 		http.Error(w, "Failed to fetch comments: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
 
-	var comments []models.Comment
+	type CommentResponse struct {
+		ID        string `json:"id"`
+		PostID    string `json:"post_id"`
+		Nickname  string `json:"nickname"`
+		Content   string `json:"content"`
+		CreatedAt string `json:"created_at"`
+	}
+	var comments []CommentResponse
 	for rows.Next() {
-		var comment models.Comment
-		if err := rows.Scan(&comment.ID, &comment.PostID, &comment.UserID, &comment.Content, &comment.CreatedAt); err != nil {
+		var c CommentResponse
+		if err := rows.Scan(&c.ID, &c.PostID, &c.Nickname, &c.Content, &c.CreatedAt); err != nil {
 			http.Error(w, "Failed to scan comment: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		comments = append(comments, comment)
-	}
-
-	// Ensure we return an empty array if there are no comments.
-	if comments == nil {
-		comments = []models.Comment{}
+		comments = append(comments, c)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

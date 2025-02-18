@@ -3,7 +3,6 @@ package routes
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"real-time-forum/backend/database"
 	"real-time-forum/backend/models"
@@ -13,7 +12,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// RegisterHandler handles user registration.
+// RegisterHandler يقوم بتسجيل المستخدمين.
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -48,7 +47,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("User registered successfully"))
 }
 
-// LoginHandler handles user login.
+// LoginHandler يقوم بمعالجة تسجيل الدخول.
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -62,9 +61,10 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var user models.User
+	// استعلام غير حساس لحالة الأحرف.
 	row := database.DB.QueryRow(`
 		SELECT id, nickname, email, password FROM users
-		WHERE email = ? OR nickname = ?`,
+		WHERE LOWER(email) = LOWER(?) OR LOWER(nickname) = LOWER(?)`,
 		loginReq.Identifier, loginReq.Identifier)
 
 	err := row.Scan(&user.ID, &user.Nickname, &user.Email, &user.Password)
@@ -82,31 +82,45 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create a new session token and set cookie.
+	// إنشاء جلسة جديدة.
 	utils.CreateSession(w, user.ID)
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Login successful"))
+	// إعادة بيانات المستخدم كـ JSON.
+	json.NewEncoder(w).Encode(map[string]string{
+		"id":       user.ID,
+		"nickname": user.Nickname,
+	})
 }
 
-// LogoutHandler handles user logout.
+// LogoutHandler يقوم بتسجيل خروج المستخدم.
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Pass both the ResponseWriter and Request to DestroySession.
 	utils.DestroySession(w, r)
-	fmt.Fprintf(w, "Logout successful")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Logout successful"))
 }
 
-// SessionHandler returns the current user's ID if the session is valid.
+// SessionHandler يعيد بيانات الجلسة الحالية للمستخدم.
 func SessionHandler(w http.ResponseWriter, r *http.Request) {
 	userID, err := utils.GetSession(r)
 	if err != nil || userID == "" {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(userID))
+	var nickname string
+	err = database.DB.QueryRow("SELECT nickname FROM users WHERE id = ?", userID).Scan(&nickname)
+	if err != nil {
+		http.Error(w, "Failed to fetch session user: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"id":       userID,
+		"nickname": nickname,
+	})
 }

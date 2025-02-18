@@ -26,7 +26,7 @@ var clients = make(map[*websocket.Conn]string)
 var broadcast = make(chan models.Message)
 var mutex = &sync.Mutex{}
 
-// ChatHandler upgrades HTTP connections to WebSocket for real‑time messaging.
+// ChatHandler upgrades HTTP connections to WebSocket for real-time messaging.
 func ChatHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -72,7 +72,7 @@ func ChatHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// HandleMessages broadcasts messages received from clients to the intended recipients.
+// HandleMessages broadcasts messages to the intended recipients.
 func HandleMessages() {
 	for {
 		msg := <-broadcast
@@ -92,7 +92,7 @@ func HandleMessages() {
 }
 
 // GetChatHistoryHandler retrieves chat history between the current user and another user.
-// Expected query parameters: with (other user's id), limit, offset.
+// It joins with the users table to retrieve the sender's nickname.
 func GetChatHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -105,7 +105,6 @@ func GetChatHistoryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get current user's ID from the session cookie.
 	currentUserID, err := utils.GetSession(r)
 	if err != nil || currentUserID == "" {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -127,11 +126,13 @@ func GetChatHistoryHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Join with users to get sender's nickname
 	query := `
-		SELECT id, sender_id, receiver_id, content, created_at
-		FROM messages
-		WHERE ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
-		ORDER BY created_at DESC
+		SELECT m.id, m.sender_id, u.nickname, m.receiver_id, m.content, m.created_at
+		FROM messages m
+		JOIN users u ON m.sender_id = u.id
+		WHERE ((m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?))
+		ORDER BY m.created_at DESC
 		LIMIT ? OFFSET ?`
 	rows, err := database.DB.Query(query, currentUserID, otherUserID, otherUserID, currentUserID, limit, offset)
 	if err != nil {
@@ -140,12 +141,20 @@ func GetChatHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var messages []models.Message
+	// Build a slice of message responses
+	var messages []map[string]string
 	for rows.Next() {
-		var msg models.Message
-		if err := rows.Scan(&msg.ID, &msg.SenderID, &msg.ReceiverID, &msg.Content, &msg.CreatedAt); err != nil {
+		var id, senderID, senderNickname, receiverID, content, createdAt string
+		if err := rows.Scan(&id, &senderID, &senderNickname, &receiverID, &content, &createdAt); err != nil {
 			http.Error(w, "Failed to scan message: "+err.Error(), http.StatusInternalServerError)
 			return
+		}
+		msg := map[string]string{
+			"id":              id,
+			"sender_nickname": senderNickname,
+			"receiver_id":     receiverID,
+			"content":         content,
+			"created_at":      createdAt,
 		}
 		messages = append(messages, msg)
 	}
