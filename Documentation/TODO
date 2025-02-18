@@ -1,4 +1,9 @@
-- Comments not showing (ordering issue).
+- Comments not showing - done
+
+
+- loading old messages (ensure that 10 messages are loaded per scroll) - done
+
+
 - Split js code into small files based on functionality for easy understanding.
 - rename error messages.
 - clear terminal unwanted messages.

@@ -38,6 +38,7 @@
 
   // Utility: API helper function; ensure array is returned for list endpoints
   async function api(path, options = {}) {
+    options.credentials = 'include';
     const res = await fetch(path, options);
     if (!res.ok) {
       const text = await res.text();
@@ -143,7 +144,21 @@
     }, 5000);
   }
 
-  // Authentication: Show login view
+  /* ==============================
+     Authentication Functions
+  ============================== */
+
+  async function logout() {
+    try {
+      await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+    } catch (error) {
+      console.error("Logout error: " + error.message);
+    }
+    currentUser = null;
+    if (ws) ws.close();
+    showLoginView();
+  }
+
   function showLoginView() {
     document.getElementById('app').innerHTML = `
       <h2>Login</h2>
@@ -164,7 +179,8 @@
         const res = await fetch('/api/login', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ identifier, password })
+          body: JSON.stringify({ identifier, password }),
+          credentials: 'include'
         });
         if (!res.ok) {
           const err = await res.text();
@@ -187,7 +203,6 @@
     });
   }
 
-  // Authentication: Show register view
   function showRegisterView() {
     document.getElementById('app').innerHTML = `
       <h2>Register</h2>
@@ -225,7 +240,8 @@
         const res = await fetch('/api/register', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify(user)
+          body: JSON.stringify(user),
+          credentials: 'include'
         });
         if (!res.ok) {
           const err = await res.text();
@@ -246,7 +262,21 @@
     });
   }
 
-  // Main view: Top bar with welcome message (Title Case), category tabs, posts feed; DM sidebar is always visible
+  async function checkSession() {
+    try {
+      const sessionData = await api('/api/session');
+      currentUser = { id: sessionData.id, nickname: sessionData.nickname };
+      initWebSocket();
+      showMainView();
+    } catch (error) {
+      showLoginView();
+    }
+  }
+
+  /* ==============================
+     Main View & Posts Functions
+  ============================== */
+
   function showMainView() {
     document.getElementById('app').innerHTML = `
       <div id="top-bar" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
@@ -263,6 +293,17 @@
         </form>
         <div id="posts-container"></div>
       </div>
+      <div id="post-comments-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+          <span id="close-comments" class="close" style="cursor:pointer;">&times;</span>
+          <h3>Comments</h3>
+          <div id="comments-container"></div>
+          <form id="comment-form">
+            <textarea id="comment-content" placeholder="Add a comment..." required></textarea>
+            <button type="submit">Post Comment</button>
+          </form>
+        </div>
+      </div>
     `;
     document.getElementById('logout-btn').addEventListener('click', logout);
     document.getElementById('post-form').addEventListener('submit', createPost);
@@ -272,12 +313,12 @@
         document.getElementById('post-form').dispatchEvent(new Event('submit'));
       }
     });
+    document.getElementById('close-comments').addEventListener('click', closeCommentsModal);
     loadPosts();
     document.getElementById('chat-sidebar').style.display = 'flex';
     initChatSidebar();
   }
 
-  // Load posts, build category tabs, and render posts filtered by category
   async function loadPosts() {
     try {
       let posts = await api('/api/posts');
@@ -292,7 +333,6 @@
     }
   }
 
-  // Create a new post and update posts list; support submission via Enter key
   async function createPost(e) {
     e.preventDefault();
     const category = document.getElementById('post-category').value;
@@ -306,7 +346,7 @@
       });
       if (!res.ok) {
         const err = await res.text();
-        return; // Suppress error for first post creation if allPosts is not defined
+        return;
       }
       const newPost = await res.json();
       if (!Array.isArray(allPosts)) {
@@ -317,24 +357,31 @@
       renderPosts(allPosts);
       document.getElementById('post-form').reset();
     } catch (error) {
-      // Suppress error message for first post creation
+      // Suppress error for first post creation
     }
   }
 
-  // Show comments modal for a specific post and start polling for real-time comments
+  /* ==============================
+     Comments Functions
+  ============================== */
+
   async function showComments(postId) {
     currentPostId = postId;
-    document.getElementById('post-comments-modal').style.display = 'flex';
+    const modal = document.getElementById('post-comments-modal');
+    if (!modal) {
+      console.error("post-comments-modal element not found");
+      return;
+    }
+    modal.style.display = 'flex';
     loadComments();
     if (commentInterval) clearInterval(commentInterval);
     commentInterval = setInterval(loadComments, 2000);
-    // Focus the comment input after modal opens
     setTimeout(() => {
-      document.getElementById('comment-content') && document.getElementById('comment-content').focus();
+      const commentInput = document.getElementById('comment-content');
+      if (commentInput) commentInput.focus();
     }, 100);
   }
 
-  // Load comments for the current post (real-time polling)
   async function loadComments() {
     const commentsContainer = document.getElementById('comments-container');
     try {
@@ -368,18 +415,21 @@
         document.getElementById('comment-form').reset();
         loadComments();
       };
-      document.getElementById('comment-content').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          document.getElementById('comment-form').dispatchEvent(new Event('submit'));
-        }
-      });
+      const commentInput = document.getElementById('comment-content');
+      if (commentInput && !commentInput.hasAttribute('data-listener')) {
+        commentInput.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            document.getElementById('comment-form').dispatchEvent(new Event('submit'));
+          }
+        });
+        commentInput.setAttribute('data-listener', 'true');
+      }
     } catch (error) {
       commentsContainer.innerHTML = '<p>No comments yet.</p>';
     }
   }
 
-  // Close comments modal and stop polling
   function closeCommentsModal() {
     document.getElementById('post-comments-modal').style.display = 'none';
     if (commentInterval) {
@@ -388,79 +438,10 @@
     }
   }
 
-  // Logout user
-  async function logout() {
-    try {
-      await fetch('/api/logout', { method: 'POST' });
-    } catch (error) {
-      console.error("Logout error: " + error.message);
-    }
-    currentUser = null;
-    if (ws) ws.close();
-    showLoginView();
-  }
+  /* ==============================
+     DM & Chat Functions
+  ============================== */
 
-  // Initialize WebSocket for DM; include sender_nickname in outgoing messages
-  function initWebSocket() {
-    ws = new WebSocket(`ws://${window.location.host}/api/chat?sender_id=${currentUser.id}`);
-    ws.onopen = function() {
-      console.log("WebSocket connected");
-    };
-    ws.onmessage = function(event) {
-      const msg = JSON.parse(event.data);
-      if (!msg.sender_nickname) {
-        msg.sender_nickname = msg.sender_id;
-      }
-      if (msg.sender_id !== currentUser.id) {
-        chatLastMessages[msg.sender_id] = msg;
-        // Show popup notification if chat with sender is not open
-        if (currentChatUser !== msg.sender_id) {
-          showNewMessagePopup(msg.sender_id, msg.sender_nickname, msg.content);
-        }
-      } else {
-        chatLastMessages[msg.receiver_id] = msg;
-      }
-      if (currentChatUser && (msg.sender_id === currentChatUser || msg.receiver_id === currentChatUser)) {
-        appendChatMessage(msg);
-      }
-      loadChatUsers();
-    };
-    ws.onclose = function() {
-      console.log("WebSocket closed");
-    };
-  }
-
-  // Popup for new DM notifications (click to open chat)
-  function showNewMessagePopup(senderId, senderNickname, messagePreview) {
-    const popup = document.createElement("div");
-    popup.className = "dm-popup";
-    popup.style.position = "fixed";
-    popup.style.bottom = "20px";
-    popup.style.right = "20px";
-    popup.style.background = "#3742fa";
-    popup.style.color = "#fff";
-    popup.style.padding = "10px 15px";
-    popup.style.borderRadius = "5px";
-    popup.style.cursor = "pointer";
-    popup.style.boxShadow = "0 2px 6px rgba(0,0,0,0.3)";
-    popup.textContent = `${toTitleCase(senderNickname)}: ${messagePreview}`;
-    popup.addEventListener("click", function() {
-      currentChatUser = senderId;
-      chatOffset = 0;
-      chatAllLoaded = false;
-      loadChatHistory(senderId, true);
-      document.body.removeChild(popup);
-    });
-    document.body.appendChild(popup);
-    setTimeout(() => {
-      if (document.body.contains(popup)) {
-        document.body.removeChild(popup);
-      }
-    }, 5000);
-  }
-
-  // Initialize DM sidebar (always visible) with online/offline grouping sorted by last message timestamp if available, else alphabetically.
-  // For offline users, allow viewing chat history but disable message input.
   function initChatSidebar() {
     const chatSidebar = document.getElementById('chat-sidebar');
     chatSidebar.innerHTML = `
@@ -493,7 +474,6 @@
     document.getElementById('chat-input').addEventListener('keydown', function(e) {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        // Only send if input is enabled (for online users)
         if (!document.getElementById('chat-input').disabled) {
           sendChatMessage();
         }
@@ -501,7 +481,6 @@
     });
   }
 
-  // Load chat users grouped by online/offline status, sorted by last message timestamp if available, else alphabetically.
   async function loadChatUsers() {
     try {
       let users = await api('/api/users');
@@ -545,7 +524,6 @@
           </div>
           <div class="chat-user-time">${time}</div>
         `;
-        // Allow clicking for both online and offline users
         li.style.cursor = "pointer";
         li.addEventListener('click', () => {
           currentChatUser = user.id;
@@ -553,14 +531,10 @@
           chatAllLoaded = false;
           loadChatHistory(user.id, true);
           loadChatUsers();
-          // Disable DM input if selected user is offline
-          if (!user.online) {
-            document.getElementById('chat-input').disabled = true;
-            document.getElementById('chat-input').placeholder = "User is offline, cannot send messages";
-          } else {
-            document.getElementById('chat-input').disabled = false;
-            document.getElementById('chat-input').placeholder = "Type a message";
-          }
+          const chatInput = document.getElementById('chat-input');
+          // Enable DM input for both online and offline users now
+          chatInput.disabled = false;
+          chatInput.placeholder = "Type a message";
         });
         if (user.online) {
           onlineList.appendChild(li);
@@ -573,7 +547,6 @@
     }
   }
 
-  // Load chat history for the selected user using scroll event; stop when all messages loaded
   async function loadChatHistory(withUserId, reset) {
     const chatWindow = document.getElementById('chat-window');
     if (reset) {
@@ -585,7 +558,6 @@
     try {
       let messages = await api(`/api/chat/history?with=${withUserId}&limit=${CHAT_LIMIT}&offset=${chatOffset}`);
       if (messages.length > 0) {
-        // Reverse messages to display chronologically (oldest at top)
         messages = messages.reverse();
         const prevScrollHeight = chatWindow.scrollHeight;
         messages.forEach(msg => {
@@ -613,7 +585,6 @@
     }
   }
 
-  // Append a new chat message to the chat window
   function appendChatMessage(msg) {
     const chatWindow = document.getElementById('chat-window');
     const msgDiv = document.createElement('div');
@@ -627,7 +598,6 @@
     chatWindow.scrollTop = chatWindow.scrollHeight;
   }
 
-  // Send a DM via WebSocket; include sender_nickname in outgoing message
   function sendChatMessage() {
     const input = document.getElementById('chat-input');
     const content = input.value.trim();
@@ -642,7 +612,48 @@
     input.value = '';
   }
 
-  // Check session and load main view if authenticated
+  function initWebSocket() {
+    ws = new WebSocket(`ws://${window.location.host}/api/chat?sender_id=${currentUser.id}`);
+    ws.onopen = function() {
+      console.log("WebSocket connected");
+    };
+    ws.onmessage = function(event) {
+      const msg = JSON.parse(event.data);
+      if (!msg.sender_nickname) {
+        msg.sender_nickname = msg.sender_id;
+      }
+      if (msg.sender_id !== currentUser.id) {
+        chatLastMessages[msg.sender_id] = msg;
+        if (currentChatUser !== msg.sender_id) {
+          showNewMessagePopup(msg.sender_id, msg.sender_nickname, msg.content);
+        }
+      } else {
+        chatLastMessages[msg.receiver_id] = msg;
+      }
+      if (currentChatUser && (msg.sender_id === currentChatUser || msg.receiver_id === currentChatUser)) {
+        appendChatMessage(msg);
+      }
+      loadChatUsers();
+    };
+    ws.onclose = function() {
+      console.log("WebSocket closed");
+    };
+  }
+
+  /* ==============================
+     Periodic Updates & Initialization
+  ============================== */
+
+  setInterval(function() {
+    if (currentUser) {
+      loadPosts();
+    }
+  }, 2000);
+
+  document.addEventListener('DOMContentLoaded', function() {
+    checkSession();
+  });
+
   async function checkSession() {
     try {
       const sessionData = await api('/api/session');
@@ -653,15 +664,4 @@
       showLoginView();
     }
   }
-
-  // Poll for new posts every 2 seconds for near real-time updates
-  setInterval(function() {
-    if (currentUser) {
-      loadPosts();
-    }
-  }, 2000);
-
-  document.addEventListener('DOMContentLoaded', function() {
-    checkSession();
-  });
 })();
