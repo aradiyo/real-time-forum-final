@@ -12,7 +12,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// RegisterHandler يقوم بتسجيل المستخدمين.
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -22,6 +21,18 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	var user models.User
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
 		http.Error(w, "Invalid input data", http.StatusBadRequest)
+		return
+	}
+
+	// Validate gender
+	if user.Gender != "Male" && user.Gender != "Female" {
+		http.Error(w, "Gender must be Male or Female", http.StatusBadRequest)
+		return
+	}
+
+	// Validate age
+	if user.Age < 1 || user.Age > 100 {
+		http.Error(w, "Age must be between 1 and 100", http.StatusBadRequest)
 		return
 	}
 
@@ -47,7 +58,6 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("User registered successfully"))
 }
 
-// LoginHandler يقوم بمعالجة تسجيل الدخول.
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -61,7 +71,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var user models.User
-	// استعلام غير حساس لحالة الأحرف.
+	// Case-insensitive query
 	row := database.DB.QueryRow(`
 		SELECT id, nickname, email, password FROM users
 		WHERE LOWER(email) = LOWER(?) OR LOWER(nickname) = LOWER(?)`,
@@ -82,18 +92,15 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// إنشاء جلسة جديدة.
 	utils.CreateSession(w, user.ID)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	// إعادة بيانات المستخدم كـ JSON.
 	json.NewEncoder(w).Encode(map[string]string{
 		"id":       user.ID,
 		"nickname": user.Nickname,
 	})
 }
 
-// LogoutHandler يقوم بتسجيل خروج المستخدم.
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -105,7 +112,6 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Logout successful"))
 }
 
-// SessionHandler يعيد بيانات الجلسة الحالية للمستخدم.
 func SessionHandler(w http.ResponseWriter, r *http.Request) {
 	userID, err := utils.GetSession(r)
 	if err != nil || userID == "" {

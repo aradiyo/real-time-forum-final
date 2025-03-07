@@ -21,12 +21,10 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-// Global variables for chat.
 var clients = make(map[*websocket.Conn]string)
 var broadcast = make(chan models.Message)
 var mutex = &sync.Mutex{}
 
-// ChatHandler upgrades HTTP connections to WebSocket for real-time messaging.
 func ChatHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -72,7 +70,6 @@ func ChatHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// HandleMessages broadcasts messages to the intended recipients.
 func HandleMessages() {
 	for {
 		msg := <-broadcast
@@ -91,8 +88,6 @@ func HandleMessages() {
 	}
 }
 
-// GetChatHistoryHandler retrieves chat history between the current user and another user.
-// It joins with the users table to retrieve the sender's nickname.
 func GetChatHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -126,7 +121,6 @@ func GetChatHistoryHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Join with users to get sender's nickname
 	query := `
 		SELECT m.id, m.sender_id, u.nickname, m.receiver_id, m.content, m.created_at
 		FROM messages m
@@ -141,7 +135,6 @@ func GetChatHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	// Build a slice of message responses
 	var messages []map[string]string
 	for rows.Next() {
 		var id, senderID, senderNickname, receiverID, content, createdAt string
@@ -159,7 +152,7 @@ func GetChatHistoryHandler(w http.ResponseWriter, r *http.Request) {
 		messages = append(messages, msg)
 	}
 
-	// Reverse messages so that the oldest appears first.
+	// Reverse messages so that the oldest appears first
 	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
 		messages[i], messages[j] = messages[j], messages[i]
 	}
@@ -168,7 +161,6 @@ func GetChatHistoryHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(messages)
 }
 
-// IsUserOnline returns true if the given user ID is connected via WebSocket.
 func IsUserOnline(userID string) bool {
 	mutex.Lock()
 	defer mutex.Unlock()

@@ -9,8 +9,6 @@ import (
 	"github.com/gofrs/uuid"
 )
 
-// CreatePostHandler allows authenticated users to create posts.
-// It returns the newly created post with the creator's nickname.
 func CreatePostHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -34,7 +32,6 @@ func CreatePostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Retrieve the creator's nickname.
 	err = database.DB.QueryRow("SELECT nickname FROM users WHERE id = ?", post.UserID).Scan(&post.Nickname)
 	if err != nil {
 		http.Error(w, "Failed to fetch user nickname: "+err.Error(), http.StatusInternalServerError)
@@ -46,7 +43,6 @@ func CreatePostHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(post)
 }
 
-// GetPostsHandler returns all posts with the creator's nickname.
 func GetPostsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -79,7 +75,6 @@ func GetPostsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(posts)
 }
 
-// CreateCommentHandler allows users to comment on posts.
 func CreateCommentHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -107,7 +102,6 @@ func CreateCommentHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Comment created successfully"))
 }
 
-// GetCommentsHandler returns comments for a given post with the commenter's nickname.
 func GetCommentsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -120,7 +114,6 @@ func GetCommentsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Join with users to retrieve the commenter's nickname.
 	query := `
 		SELECT c.id, c.post_id, u.nickname, c.content, c.created_at
 		FROM comments c

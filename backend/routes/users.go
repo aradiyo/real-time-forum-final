@@ -9,7 +9,6 @@ import (
 	"real-time-forum/backend/utils"
 )
 
-// GetUsersHandler returns a list of all users (except the current user) with their online status.
 func GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -36,7 +35,6 @@ func GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Failed to scan user: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		// Set online status using the helper from chat.go.
 		user.Online = IsUserOnline(user.ID)
 		users = append(users, user)
 	}
