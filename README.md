@@ -1,21 +1,49 @@
 # Real-Time Forum
 
-A single-page application forum with real-time communication capabilities implemented with WebSockets.
+A single-page application forum with real-time communication capabilities implemented with WebSockets, allowing users to communicate, share posts, and engage in real-time discussions.
 
 ## Features
 
-- User authentication (registration and login)
-- Post creation with categories
-- Commenting on posts
-- Real-time private messaging
-- Online/offline user status
+### User Authentication
+- Secure registration with email validation
+- Custom-designed form elements with improved usability
+- Enhanced date picker with month/year selection and calendar popup
+- Gender selection with clear labeling
+- Password confirmation to prevent typos
+- Login with session management
+- Logout functionality with proper session cleanup
+
+### Posts and Comments
+- Create posts with multiple categories
+- View posts with category filtering
+- Responsive post layout with title, content, author, and timestamp
+- Add comments to any post
+- View nested comments in real-time
+- Proper formatting for text content
+
+### Real-Time Messaging
+- Private real-time chat with WebSockets
+- Message history is preserved between sessions
+- Automatic scrolling for new messages
+- Load previous messages on scroll
+- Online/offline user indicators
+- New message notifications
+- Empty chat state handling ("No messages found" removal on typing)
+
+### User Interface
+- Single-page application with smooth transitions
+- Responsive design for different screen sizes
+- Dark theme for comfortable viewing
+- Real-time updates without page refreshes
+- Improved form elements with better usability
+- Clean and intuitive navigation
 
 ## Technology Stack
 
 - **Backend**: Go with Gorilla WebSockets
 - **Frontend**: HTML, CSS, JavaScript (Single Page Application)
 - **Database**: SQLite
-- **Authentication**: bcrypt for password hashing
+- **Authentication**: bcrypt for password hashing and secure cookies
 - **UUID Generation**: For unique identifiers
 
 ## Project Structure
@@ -80,6 +108,11 @@ A single-page application forum with real-time communication capabilities implem
 3. Comment on posts by clicking on them
 4. Chat with online users via the sidebar
 5. Filter posts by category using the tabs
+
+## Authors
+
+- **alalaradi**
+- **hasabbas**
 
 ## License
 
