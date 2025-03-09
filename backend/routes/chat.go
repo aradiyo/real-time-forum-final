@@ -47,7 +47,7 @@ func ChatHandler(w http.ResponseWriter, r *http.Request) {
 		var msg models.Message
 		err := conn.ReadJSON(&msg)
 		if err != nil {
-			fmt.Println("Error reading message:", err)
+			//fmt.Println("Error reading message:", err) - for debugging
 			mutex.Lock()
 			delete(clients, conn)
 			mutex.Unlock()
@@ -126,7 +126,7 @@ func GetChatHistoryHandler(w http.ResponseWriter, r *http.Request) {
 		FROM messages m
 		JOIN users u ON m.sender_id = u.id
 		WHERE ((m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?))
-		ORDER BY m.created_at DESC
+		ORDER BY m.created_at ASC
 		LIMIT ? OFFSET ?`
 	rows, err := database.DB.Query(query, currentUserID, otherUserID, otherUserID, currentUserID, limit, offset)
 	if err != nil {
@@ -152,13 +152,41 @@ func GetChatHistoryHandler(w http.ResponseWriter, r *http.Request) {
 		messages = append(messages, msg)
 	}
 
-	// Reverse messages so that the oldest appears first
-	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
-		messages[i], messages[j] = messages[j], messages[i]
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(messages)
+}
+
+func GetChatMessageCountHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	otherUserID := r.URL.Query().Get("with")
+	if otherUserID == "" {
+		http.Error(w, "Missing 'with' parameter", http.StatusBadRequest)
+		return
+	}
+
+	currentUserID, err := utils.GetSession(r)
+	if err != nil || currentUserID == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	query := `
+		SELECT COUNT(*) 
+		FROM messages 
+		WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)`
+	var count int
+	err = database.DB.QueryRow(query, currentUserID, otherUserID, otherUserID, currentUserID).Scan(&count)
+	if err != nil {
+		http.Error(w, "Failed to count messages: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(messages)
+	json.NewEncoder(w).Encode(map[string]int{"count": count})
 }
 
 func IsUserOnline(userID string) bool {

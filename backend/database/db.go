@@ -38,7 +38,7 @@ func createUsersTable() {
 	if err != nil {
 		log.Fatalf("Failed to create users table: %v", err)
 	}
-	log.Println("Users table created successfully (if it didn't exist).")
+	//log.Println("Users table created successfully (if it didn't exist).") - for debugging purposes
 }
 
 func createPostsTable() {
@@ -55,7 +55,7 @@ func createPostsTable() {
 	if err != nil {
 		log.Fatalf("Failed to create posts table: %v", err)
 	}
-	log.Println("Posts table created successfully (if it didn't exist).")
+	//log.Println("Posts table created successfully (if it didn't exist).") - for debugging purposes
 }
 
 func createCommentsTable() {
@@ -73,7 +73,7 @@ func createCommentsTable() {
 	if err != nil {
 		log.Fatalf("Failed to create comments table: %v", err)
 	}
-	log.Println("Comments table created successfully (if it didn't exist).")
+	//log.Println("Comments table created successfully (if it didn't exist).") // for debugging purposes
 }
 
 func createMessagesTable() {
@@ -91,5 +91,5 @@ func createMessagesTable() {
 	if err != nil {
 		log.Fatalf("Failed to create messages table: %v", err)
 	}
-	log.Println("Messages table created successfully (if it didn't exist).")
+	//log.Println("Messages table created successfully (if it didn't exist).") - for debugging purposes
 }

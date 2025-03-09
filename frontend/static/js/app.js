@@ -3,7 +3,8 @@ let ws = null; // WebSocket connection
 let currentChatUser = null; // Selected chat partner for DM
 let currentPostId = null; // Current post id for comments modal
 let chatOffset = 0;
-const CHAT_LIMIT = 10;
+const POSTS_LIMIT = 10;
+const CHAT_LIMIT = 10; // Returning to 10 messages per scroll as requested
 let chatAllLoaded = false; // Flag to indicate that all messages have been loaded
 let commentInterval = null; // Interval for polling comments when modal is open
 let allPosts = []; // Store all posts for filtering by category
@@ -15,7 +16,7 @@ let chatUserStatus = {}; // Store user online status
 function showMainView() {
   document.getElementById('app').innerHTML = `
     <div id="top-bar" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
-      <span id="welcome-msg" style="font-size: 1.2em; font-weight: bold;">Welcome, ${toTitleCase(currentUser.nickname)}</span>
+      <span id="welcome-msg" style="font-size: 1.2em; font-weight: bold;">Welcome ${toTitleCase(currentUser.nickname)}</span>
       <button id="logout-btn" style="margin-right: 10px;">Logout</button>
     </div>
     <div id="category-tabs" style="margin-bottom: 10px;"></div>
@@ -62,4 +63,15 @@ window.postsInterval = setInterval(function () {
 }, 2000);
 
 // Initialize on DOM load
-document.addEventListener('DOMContentLoaded', checkSession);
+document.addEventListener('DOMContentLoaded', () => {
+  checkSession();
+  
+  // Handle back-to-top button click on mobile
+  document.addEventListener('click', (e) => {
+    // Check if click is on the back-to-top button (the ::after pseudo-element)
+    const appElement = document.getElementById('app');
+    if (appElement && e.clientX >= appElement.offsetWidth - 60 && e.clientY >= window.innerHeight / 2) {
+      appElement.scrollTop = 0;
+    }
+  });
+});

@@ -8,6 +8,21 @@ done:
 - Handle console errors when user logs out - done
 - Rename error messages to be more user-friendly - done
 - Clear unwanted console messages - done
+- add password confirmation box in frontend and ensure that both passwords are match before submission! - done
+- in direct messages, loading old messages must be added to the current messages! 
+
+
+not done:
+- side-chat and main app are overlapping.
+- regestration calender to be fixed (some years are beyond today's date) + when click on years, it shows only from 2020-2029.
+- regestration form box size styling (font size to be adjusted)
+- in post creation, content size must be fix.
+
+
+
+
+
+
 
 final check: 
 - Final Test, let collaborator test it as well.

@@ -3,10 +3,12 @@ package routes
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"real-time-forum/backend/database"
 	"real-time-forum/backend/models"
 	"real-time-forum/backend/utils"
+	"strings"
 
 	"github.com/gofrs/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -24,6 +26,18 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Clean inputs to prevent issues with leading/trailing spaces
+	user.Nickname = strings.TrimSpace(user.Nickname)
+	user.Email = strings.TrimSpace(user.Email)
+	user.FirstName = strings.TrimSpace(user.FirstName)
+	user.LastName = strings.TrimSpace(user.LastName)
+
+	// Check for empty required fields after trimming
+	if user.Nickname == "" || user.Email == "" || user.Password == "" {
+		http.Error(w, "Nickname, email, and password are required fields", http.StatusBadRequest)
+		return
+	}
+
 	// Validate gender
 	if user.Gender != "Male" && user.Gender != "Female" {
 		http.Error(w, "Gender must be Male or Female", http.StatusBadRequest)
@@ -33,6 +47,27 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	// Validate age
 	if user.Age < 1 || user.Age > 100 {
 		http.Error(w, "Age must be between 1 and 100", http.StatusBadRequest)
+		return
+	}
+
+	// Check for unique email (case-insensitive check)
+	var existingId string
+	err := database.DB.QueryRow("SELECT id FROM users WHERE LOWER(email) = LOWER(?)", user.Email).Scan(&existingId)
+	if err == nil {
+		http.Error(w, "Email already in use", http.StatusBadRequest)
+		return
+	} else if err != sql.ErrNoRows {
+		http.Error(w, "Failed to check email uniqueness: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Check for unique nickname (case-insensitive check)
+	err = database.DB.QueryRow("SELECT id FROM users WHERE LOWER(nickname) = LOWER(?)", user.Nickname).Scan(&existingId)
+	if err == nil {
+		http.Error(w, "Nickname already in use", http.StatusBadRequest)
+		return
+	} else if err != sql.ErrNoRows {
+		http.Error(w, "Failed to check nickname uniqueness: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -50,7 +85,8 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		user.ID, user.Nickname, user.Email, user.Password, user.FirstName, user.LastName, user.Age, user.Gender)
 	if err != nil {
-		http.Error(w, "Failed to create user: "+err.Error(), http.StatusInternalServerError)
+		errorMsg := fmt.Sprintf("Failed to create user: %v", err.Error())
+		http.Error(w, errorMsg, http.StatusInternalServerError)
 		return
 	}
 

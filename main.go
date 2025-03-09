@@ -45,6 +45,7 @@ func main() {
 	http.HandleFunc("/api/comments", utils.AuthMiddleware(routes.GetCommentsHandler))
 	http.HandleFunc("/api/chat", utils.AuthMiddleware(routes.ChatHandler))
 	http.HandleFunc("/api/chat/history", utils.AuthMiddleware(routes.GetChatHistoryHandler))
+	http.HandleFunc("/api/chat/count", utils.AuthMiddleware(routes.GetChatMessageCountHandler))
 	http.HandleFunc("/api/users", utils.AuthMiddleware(routes.GetUsersHandler))
 
 	// Start a goroutine to handle WebSocket message broadcasting.
@@ -56,6 +57,7 @@ func main() {
 	// Serve the SPA index.html.
 	http.HandleFunc("/", serveIndex)
 
+	fmt.Println("Welcome to Real-Time Forum!")
 	fmt.Println("Server is running on http://localhost:8080")
 	err := http.ListenAndServe(":8080", nil)
 	if err != nil {

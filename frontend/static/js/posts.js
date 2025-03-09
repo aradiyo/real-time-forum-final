@@ -53,8 +53,7 @@ async function loadPosts() {
     tabContainer.innerHTML = "";
     const allTab = document.createElement("button");
     allTab.textContent = "All";
-    allTab.style.marginRight = "5px";
-    allTab.className = currentCategory === "All" ? "active-tab" : "";
+    allTab.className = currentCategory === "All" ? "active" : "";
     allTab.addEventListener("click", () => {
       currentCategory = "All";
       renderPosts(allPosts);
@@ -64,8 +63,7 @@ async function loadPosts() {
     categories.forEach(cat => {
       const btn = document.createElement("button");
       btn.textContent = cat;
-      btn.style.marginRight = "5px";
-      btn.className = currentCategory === cat ? "active-tab" : "";
+      btn.className = currentCategory === cat ? "active" : "";
       btn.addEventListener("click", () => {
         currentCategory = cat;
         renderPosts(allPosts);
@@ -84,20 +82,28 @@ async function loadPosts() {
       filtered = posts.filter(post => post.category === currentCategory);
     }
     if (!filtered || filtered.length === 0) {
-      container.innerHTML = `<p>There is no posts yet, Please create one!</p>`;
+      container.innerHTML = `<p class="empty-state">There are no posts yet. Please create one!</p>`;
       return;
     }
     filtered.forEach(post => {
       const postDiv = document.createElement('div');
       postDiv.className = 'post';
+      
+      // Format the date for better display
+      const postDate = formatDate(post.created_at, 'full');
+      
       postDiv.innerHTML = `
-        <h3>Category: ${post.category}</h3>
-        <p>${post.content}</p>
-        <small>${formatDate(post.created_at)}</small>
-        <br>
-        <small>Created by: ${toTitleCase(post.nickname)}</small>
-        <br>
-        <button data-post-id="${post.id}" class="view-comments-btn">View Comments</button>
+        <div class="post-header">
+          <h3>${post.category}</h3>
+          <div class="post-meta">
+            <span class="post-author">By: ${toTitleCase(post.nickname)}</span>
+            <span class="post-date">${postDate}</span>
+          </div>
+        </div>
+        <div class="post-content">${post.content}</div>
+        <div class="post-actions">
+          <button data-post-id="${post.id}" class="view-comments-btn">View Comments</button>
+        </div>
       `;
       container.appendChild(postDiv);
     });

@@ -22,14 +22,20 @@ async function showComments(postId) {
     try {
       let comments = await api(`/api/comments?post_id=${currentPostId}`);
       if (!Array.isArray(comments) || comments.length === 0) {
-        commentsContainer.innerHTML = '<p>Be the first to comment on this post!</p>';
+        commentsContainer.innerHTML = '<p class="empty-state">Be the first to comment on this post!</p>';
       } else {
         commentsContainer.innerHTML = '';
         comments.forEach(comment => {
           const commentDiv = document.createElement('div');
           commentDiv.className = 'comment';
           const displayName = comment.nickname ? toTitleCase(comment.nickname) : comment.user_id;
-          commentDiv.innerHTML = `<p><strong>${displayName}:</strong> ${comment.content}</p><small>${formatDate(comment.created_at)}</small>`;
+          commentDiv.innerHTML = `
+            <div class="meta">
+              <strong>${displayName}</strong> 
+              <span class="comment-date">${formatDate(comment.created_at, 'full')}</span>
+            </div>
+            <div class="comment-content">${comment.content}</div>
+          `;
           commentsContainer.appendChild(commentDiv);
         });
       }
