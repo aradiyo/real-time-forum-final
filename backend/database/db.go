@@ -84,6 +84,7 @@ func createMessagesTable() {
 		receiver_id TEXT NOT NULL,
 		content TEXT NOT NULL,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		sequence INTEGER DEFAULT 0,
 		FOREIGN KEY(sender_id) REFERENCES users(id),
 		FOREIGN KEY(receiver_id) REFERENCES users(id)
 	);`

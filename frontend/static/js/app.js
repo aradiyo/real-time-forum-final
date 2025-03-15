@@ -40,6 +40,9 @@ function showMainView() {
         </form>
       </div>
     </div>
+      <footer id="page-footer">
+    <p>Powered by <span class="footer-names">alalaradi & hasabbas</span></p>
+  </footer>
   `;
   document.getElementById('logout-btn').addEventListener('click', logout);
   document.getElementById('post-form').addEventListener('submit', createPost);

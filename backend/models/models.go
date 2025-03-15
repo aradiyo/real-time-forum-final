@@ -41,4 +41,5 @@ type Message struct {
 	ReceiverID     string `json:"receiver_id"`
 	Content        string `json:"content"`
 	CreatedAt      string `json:"created_at"`
+	Sequence       int    `json:"sequence"`
 }

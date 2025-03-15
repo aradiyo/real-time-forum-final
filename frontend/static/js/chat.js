@@ -84,6 +84,9 @@ function initChatSidebar() {
   
   // Load chat history for all users to populate chatLastMessages
   async function loadInitialChatData() {
+    // Reset chatLastMessages to ensure we don't have any stale data
+    chatLastMessages = {};
+    
     try {
       // Load users with their last messages already populated by the backend
       let users = await api('/api/users');
@@ -267,8 +270,12 @@ async function loadChatUsers() {
 // Select chat user and load history
 function selectChatUser(userId) {
   console.log('Selecting chat user:', userId);
-  // Only change users if different
-  if (currentChatUser !== userId) {
+  
+  // Only change users if different or if reload is needed
+  if (currentChatUser !== userId || document.getElementById('chat-window').innerHTML === '') {
+    // Clear the chat window completely first to avoid stale data
+    document.getElementById('chat-window').innerHTML = '';
+    
     // Update UI for selection
     currentChatUser = userId;
     document.querySelectorAll('.chat-user-item').forEach(el => {
@@ -287,6 +294,8 @@ function selectChatUser(userId) {
     chatInput.placeholder = "Type a message";
     
     // Reset and load the recent chat history
+    chatOffset = 0;
+    chatAllLoaded = false;
     loadChatHistory(userId, true);
   }
 }
@@ -312,8 +321,16 @@ async function loadChatHistory(withUserId, reset) {
   
   try {
     console.log(`Fetching messages with limit ${CHAT_LIMIT} offset ${chatOffset}`);
-    const response = await fetch(`/api/chat/history?with=${withUserId}&limit=${CHAT_LIMIT}&offset=${chatOffset}`, {
-      credentials: 'include'
+    
+    // Add a timestamp parameter to avoid browser caching
+    const timestamp = new Date().getTime();
+    const response = await fetch(`/api/chat/history?with=${withUserId}&limit=${CHAT_LIMIT}&offset=${chatOffset}&_t=${timestamp}`, {
+      credentials: 'include',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
     });
     
     if (!response.ok) {
@@ -329,36 +346,19 @@ async function loadChatHistory(withUserId, reset) {
       indicator.remove();
     }
     
+    // Remove any "No messages found" error message when loading new messages
+    removeNoMessagesError();
+    
     if (messages.length === 0) {
       if (chatOffset === 0) {
         chatWindow.innerHTML = '<p class="no-messages">No messages yet.</p>';
         chatAllLoaded = true;
+      } else {
+        // No more messages to load
+        chatAllLoaded = true;
       }
       return;
     }
-    
-    // Create message elements
-    const messageElements = [];
-    messages.forEach(msg => {
-      const msgDiv = document.createElement('div');
-      msgDiv.className = 'chat-message';
-      const displayName = msg.sender_nickname ? msg.sender_nickname : msg.sender_id;
-      
-      // Find the user in the users list to get the gender
-      api('/api/users').then(users => {
-        const sender = users.find(u => u.id === msg.sender_id);
-        if (sender) {
-          const nicknameColor = sender.gender === 'Male' ? '#89CFF0' : sender.gender === 'Female' ? '#F4C2C2' : 'inherit';
-          msgDiv.querySelector('.sender-nickname').style.color = nicknameColor;
-        }
-      }).catch(() => {});
-      
-      msgDiv.innerHTML = `
-        <div class="meta"><strong class="sender-nickname">${toTitleCase(displayName)}</strong> ${formatDate(msg.created_at, 'full')}</div>
-        <div>${msg.content}</div>
-      `;
-      messageElements.push(msgDiv);
-    });
     
     // Get or create messages container
     let messageContainer = chatWindow.querySelector('.messages-container');
@@ -368,25 +368,48 @@ async function loadChatHistory(withUserId, reset) {
       chatWindow.appendChild(messageContainer);
     }
     
+    // Create message elements
+    const messageElements = [];
+    
+    // Messages should already be in correct order from the server
+    // Just display them in the order received
+    messages.forEach(msg => {
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'chat-message';
+      const displayName = msg.sender_nickname ? msg.sender_nickname : msg.sender_id;
+      
+      msgDiv.innerHTML = `
+        <div class="meta"><strong class="sender-nickname">${toTitleCase(displayName)}</strong> ${formatDate(msg.created_at, 'full')}</div>
+        <div>${msg.content}</div>
+      `;
+      
+      // Find the user in the users list to get the gender (asynchronously)
+      api('/api/users').then(users => {
+        const sender = users.find(u => u.id === msg.sender_id);
+        if (sender) {
+          const nicknameColor = sender.gender === 'Male' ? '#89CFF0' : sender.gender === 'Female' ? '#F4C2C2' : 'inherit';
+          const nicknameElement = msgDiv.querySelector('.sender-nickname');
+          if (nicknameElement) {
+            nicknameElement.style.color = nicknameColor;
+          }
+        }
+      }).catch(() => {});
+      
+      messageElements.push(msgDiv);
+    });
+    
     if (reset) {
       // Replace all messages
       messageContainer.innerHTML = '';
+      // Append messages in order (should be oldest to newest)
       messageElements.forEach(msg => messageContainer.appendChild(msg));
     } else {
-      // Prepend older messages at the beginning (not the end)
-      const prevScrollHeight = chatWindow.scrollHeight;
-      
-      // Reverse the elements to maintain correct chronological order
-      // This ensures older messages appear at the top and newer messages at the bottom
-      messageElements.reverse();
-      
-      // Insert at the beginning of the container
-      messageElements.forEach(msg => {
-        messageContainer.insertBefore(msg, messageContainer.firstChild);
-      });
-      
-      // Adjust scroll position to stay at the same point
-      chatWindow.scrollTop = chatWindow.scrollHeight - prevScrollHeight;
+      // Prepend older messages at the start
+      // Since the backend returns messages in chronological order,
+      // add them in reverse to put oldest messages at the top
+      for (let i = messageElements.length - 1; i >= 0; i--) {
+        messageContainer.insertBefore(messageElements[i], messageContainer.firstChild);
+      }
     }
     
     // Update offset and status
@@ -397,20 +420,23 @@ async function loadChatHistory(withUserId, reset) {
     
     // Update chat last messages for sidebar
     if (reset && messages.length > 0) {
+      // Find the latest message (should be the last one in the array)
       const lastMsg = messages[messages.length - 1];
-      if (lastMsg.sender_id === currentUser.id) {
-        chatLastMessages[withUserId] = {
-          content: lastMsg.content,
-          created_at: lastMsg.created_at
-        };
-      } else {
-        chatLastMessages[lastMsg.sender_id] = {
-          content: lastMsg.content,
-          created_at: lastMsg.created_at
-        };
+      if (lastMsg) {
+        if (lastMsg.sender_id === currentUser.id) {
+          chatLastMessages[withUserId] = {
+            content: lastMsg.content,
+            created_at: lastMsg.created_at
+          };
+        } else {
+          chatLastMessages[lastMsg.sender_id] = {
+            content: lastMsg.content,
+            created_at: lastMsg.created_at
+          };
+        }
+        // Update user list to reflect the new message previews
+        loadChatUsers();
       }
-      // Update user list to reflect the new message previews
-      loadChatUsers();
     }
     
     // Scroll to bottom on initial load
@@ -431,6 +457,16 @@ async function loadChatHistory(withUserId, reset) {
 // Append a new chat message
 function appendChatMessage(msg) {
   const chatWindow = document.getElementById('chat-window');
+  
+  // Remove any "No messages found" error message when new message arrives
+  removeNoMessagesError();
+  
+  // Remove "No messages yet" if it exists
+  const noMessagesText = chatWindow.querySelector('.no-messages');
+  if (noMessagesText) {
+    noMessagesText.remove();
+  }
+  
   const msgDiv = document.createElement('div');
   const displayName = msg.sender_nickname ? msg.sender_nickname : msg.sender_id;
   msgDiv.className = 'chat-message';
@@ -450,8 +486,31 @@ function appendChatMessage(msg) {
     }
   }).catch(() => {});
   
-  chatWindow.appendChild(msgDiv);
+  // Get or create messages container
+  let messageContainer = chatWindow.querySelector('.messages-container');
+  if (!messageContainer) {
+    messageContainer = document.createElement('div');
+    messageContainer.className = 'messages-container';
+    chatWindow.appendChild(messageContainer);
+  }
+  
+  // Add the message to the end of the container (newest messages at the bottom)
+  messageContainer.appendChild(msgDiv);
+  
+  // Scroll to the new message
   chatWindow.scrollTop = chatWindow.scrollHeight;
+}
+
+// Helper function to remove the "No messages found" error message
+function removeNoMessagesError() {
+  const chatWindow = document.getElementById('chat-window');
+  // Remove error messages
+  const errorMessages = chatWindow.querySelectorAll('.error-message');
+  errorMessages.forEach(msg => msg.remove());
+  
+  // Also remove "No messages yet" placeholder
+  const noMessagesYet = chatWindow.querySelectorAll('.no-messages');
+  noMessagesYet.forEach(msg => msg.remove());
 }
 
 // Send a chat message with user selection check
@@ -477,20 +536,13 @@ function sendChatMessage() {
   input.value = '';
 }
 
-// Helper function to remove the "No messages found" error message
-function removeNoMessagesError() {
-  const chatWindow = document.getElementById('chat-window');
-  const errorMessages = chatWindow.querySelectorAll('.error-message');
-  errorMessages.forEach(msg => msg.remove());
-}
-
 // Initialize WebSocket with proper error handling
 function initWebSocket() {
   try {
     ws = new WebSocket(`ws://${window.location.host}/api/chat?sender_id=${currentUser.id}`);
     
     ws.onopen = function () {
-      // Connection established - no logging needed
+      console.log("WebSocket connection established");
     };
     
     ws.onmessage = function (event) {
@@ -499,6 +551,9 @@ function initWebSocket() {
         if (!msg.sender_nickname) {
           msg.sender_nickname = msg.sender_id;
         }
+        
+        // Remove any "No messages found" error message when new message arrives
+        removeNoMessagesError();
         
         // Update last message data
         if (msg.sender_id !== currentUser.id) {
@@ -523,16 +578,16 @@ function initWebSocket() {
         // Reload chat users to update the sorting
         loadChatUsers();
       } catch (error) {
-        // Silent error handling for production
+        console.error("Error handling WebSocket message:", error);
       }
     };
     
     ws.onclose = function (event) {
-      // Connection closed - no logging needed
+      console.log("WebSocket connection closed");
     };
     
     ws.onerror = function (error) {
-      // Silent error handling for production
+      console.error("WebSocket error:", error);
     };
     
     // Add event listener for chat input to remove "No messages found" when typing
@@ -542,6 +597,6 @@ function initWebSocket() {
     }
     
   } catch (error) {
-    // Silent error handling for production
+    console.error("Error initializing WebSocket:", error);
   }
 }
